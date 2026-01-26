@@ -9,24 +9,32 @@ import 'package:flutter/cupertino.dart';
 class ComandaController extends ChangeNotifier {
   List<Itens> itens = [];
 
-  // CORREÇÃO: Cálculo do total considerando Quantidade x Valor Unitário
+  // Cálculo do total
   double get valorComanda {
-    double soma = 0;
-    for (var element in itens) {
-      // Soma valor do item * quantidade
-      soma += (element.valor! * (element.quantidade ?? 1));
+    double somaTotal = 0.0;
 
-      // Soma valor dos complementos (se houver)
-      if (element.complementos != null && element.complementos!.isNotEmpty) {
-        double totalComplementos = element.complementos!
-            .map((e) => e.valor * e.quantidade)
-            .fold(0.0, (a, b) => a + b);
-        soma += totalComplementos;
+    for (var item in itens) {
+      double valorItemBase = (item.valor ?? 0.0).toDouble();
+      double valorAdicionais = 0.0;
+
+      if (item.complementos != null && item.complementos!.isNotEmpty) {
+        for (var comp in item.complementos!) {
+          double valComp = (comp.valor).toDouble();
+          double qtdComp = (comp.quantidade ?? 0).toDouble();
+          valorAdicionais += (valComp * qtdComp);
+        }
       }
+
+      double quantidadeItem = (item.quantidade ?? 1.0).toDouble();
+      double valorUnitarioCheio = valorItemBase + valorAdicionais;
+
+      somaTotal += (valorUnitarioCheio * quantidadeItem);
     }
-    return soma;
+
+    return somaTotal;
   }
 
+  // Retorna a quantidade total de um produto específico (para mostrar no badge do grid)
   double getQuantidade(int produto) {
     double quantidade = 0;
     for (var element in itens) {
@@ -40,34 +48,29 @@ class ComandaController extends ChangeNotifier {
   int get totalItens => itens.length;
   bool get isEmpty => itens.isEmpty;
 
-  // LÓGICA DE SOMAR QUANTIDADE
+  // MODIFICADO: Adiciona sempre uma NOVA LINHA, sem somar quantidade
   void adicionaItem(Produtos produto, String idAgrupamento,
       {GradeProduto? gradeProduto,
       double quantidade = 1.0,
       required int usuario}) {
-    // Procura se já existe um item com o mesmo Código e mesmo Agrupamento (Grade)
-    int index = itens.indexWhere((item) =>
-        item.produto == produto.codigo && item.idAgrupamento == idAgrupamento);
+    // Removida a lógica de "indexWhere" que buscava item existente.
+    // Agora sempre adiciona um novo item na lista.
 
-    if (index != -1) {
-      // SE JÁ EXISTE: Apenas incrementa a quantidade
-      itens[index].quantidade = (itens[index].quantidade ?? 0) + quantidade;
-    } else {
-      // SE NÃO EXISTE: Cria uma nova linha na lista
-      itens.add(
-        Itens(
-            codigo: itens.length + 1,
-            produto: produto.codigo,
-            quantidade: quantidade,
-            valor: produto.valor, // Mantém o Valor Unitário
-            nome: produto.nome,
-            grade: produto.grade,
-            gradeProduto: gradeProduto,
-            usuario: usuario,
-            idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
-            complementos: []),
-      );
-    }
+    itens.add(
+      Itens(
+          // Gera um código único baseado no timestamp para garantir unicidade na lista
+          codigo: DateTime.now().millisecondsSinceEpoch,
+          produto: produto.codigo,
+          quantidade: quantidade,
+          valor: produto.valor,
+          nome: produto.nome,
+          grade: produto.grade,
+          gradeProduto: gradeProduto,
+          usuario: usuario,
+          idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
+          complementos: []),
+    );
+
     notifyListeners();
   }
 
@@ -76,35 +79,35 @@ class ComandaController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Remove todas as ocorrências de um produto (usado pelos botões de - no catálogo)
   void removeItem(int? codProduto) {
-    itens.removeWhere((e) => e.produto == codProduto);
-    notifyListeners();
+    // Remove a última ocorrência encontrada para dar sensação de "desempilhar" visualmente
+    var index = itens.lastIndexWhere((e) => e.produto == codProduto);
+    if (index != -1) {
+      itens.removeAt(index);
+      notifyListeners();
+    }
   }
 
+  // MODIFICADO: Remove a linha específica clicada no carrinho
   void removeItemCarrinho(Itens item) {
-    if (item.gradeProduto != null) {
-      itens.removeWhere((e) => e.idAgrupamento == item.idAgrupamento);
-    } else {
-      // Remove o objeto específico da lista
-      itens.remove(item);
-    }
+    // Remove pela referência do objeto, garantindo que apague apenas a linha clicada
+    itens.remove(item);
     notifyListeners();
   }
 
   void diminuirQuantidade(int? codigo) {
-    // Encontra o item (preferencialmente o último adicionado ou pelo index)
-    // Para simplificar, pega o primeiro que encontrar desse produto
-    var index = itens.indexWhere((e) => e.produto == codigo);
+    // Encontra o último item adicionado desse produto
+    var index = itens.lastIndexWhere((e) => e.produto == codigo);
 
     if (index != -1) {
       var item = itens[index];
       if ((item.quantidade ?? 0) > 1) {
         item.quantidade = item.quantidade! - 1.0;
       } else {
-        // Se chegar a 1 e diminuir, remove o item
+        // Se a quantidade for 1, remove a linha
         itens.removeAt(index);
       }
-      // OBS: Não alteramos mais o 'item.valor' aqui para preservar o valor unitário
     }
     notifyListeners();
   }
@@ -135,6 +138,7 @@ class ComandaController extends ChangeNotifier {
   }
 
   void adicionaObservacao(int? codItem, String obs) {
+    // Busca pelo código único gerado no adicionaItem
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
       itens[indice].obs = obs;
@@ -143,9 +147,10 @@ class ComandaController extends ChangeNotifier {
   }
 
   void adicionaComplementos(int? codItem, List<Complementos> complementos) {
+    // Busca pelo código único gerado no adicionaItem
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
-      itens[indice].complementos = complementos;
+      itens[indice].complementos = List.from(complementos);
       notifyListeners();
     }
   }

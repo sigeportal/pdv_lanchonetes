@@ -23,21 +23,17 @@ class CategoriaPage extends StatefulWidget {
 }
 
 class _CategoriaPageState extends State<CategoriaPage> {
-  // Services
   final _serviceProdutos = ProdutosService();
   final _formatMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-  // Estado Local
   List<Categoria> _categorias = [];
   List<Produtos> _produtos = [];
   int? _selectedCategoriaId;
 
-  // Controles de Estado UI
   bool _isLoadingProdutos = false;
   bool _isLoadingCategorias = true;
   String? _erroMensagem;
 
-  // Controllers de Scroll
   final ScrollController _produtosScrollController = ScrollController();
   final ScrollController _comandaScrollController = ScrollController();
   final ScrollController _categoriasScrollController = ScrollController();
@@ -57,8 +53,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     _categoriasScrollController.dispose();
     super.dispose();
   }
-
-  // --- LÓGICA DE DADOS ---
 
   Future<void> _carregarDadosIniciais() async {
     setState(() {
@@ -121,9 +115,40 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
-  // --- WIDGETS VISUAIS ---
+  // --- FUNÇÃO AUXILIAR DE CONFIRMAÇÃO ---
+  Future<bool> _confirmarExclusao(BuildContext context) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("Remover Item",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            content: const Text(
+                "Tem certeza que deseja remover este item do carrinho?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text("CANCELAR",
+                    style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text("REMOVER",
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
 
-  // Botão de Categoria
   Widget _buildCategoriaTab(Categoria item) {
     bool isSelected = _selectedCategoriaId == item.codigo;
     return Padding(
@@ -167,7 +192,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     );
   }
 
-  // Área Esquerda: Catálogo
   Widget _buildCatalogoArea() {
     if (_erroMensagem != null) {
       return Center(
@@ -230,10 +254,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                               bottom: 40, top: 10, left: 4, right: 4),
                           gridDelegate:
                               const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 380,
-                            childAspectRatio: 0.8,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
+                            // AJUSTE PARA 4 COLUNAS EM TABLET:
+                            // 220px é suficiente para caber ~4 itens em 900px de largura disponível
+                            maxCrossAxisExtent: 220,
+                            // Aspect Ratio menor para o card ficar mais alto (0.75) e acomodar foto/texto
+                            childAspectRatio: 0.75,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
                           ),
                           itemCount: _produtos.length,
                           itemBuilder: (context, index) {
@@ -250,19 +277,21 @@ class _CategoriaPageState extends State<CategoriaPage> {
     );
   }
 
-  // Item da Comanda (Direita) - MODIFICADO
+  // --- ITEM DA COMANDA ---
   Widget _buildComandaItem(Itens item, ComandaController controller) {
-    double totalItem = item.valor ?? 0;
-    double totalComplementos = 0;
+    double valorBase = item.valor ?? 0;
+    double valorExtrasUnitario = 0;
 
     if (item.complementos != null) {
       for (var comp in item.complementos!) {
-        totalComplementos += (comp.valor * comp.quantidade);
+        valorExtrasUnitario += (comp.valor * comp.quantidade);
       }
     }
-    // Cálculo correto do total visual da linha
-    double totalFinal =
-        (totalItem * (item.quantidade ?? 1)) + totalComplementos;
+
+    // Valor total de UMA unidade completa
+    double precoUnitarioCheio = valorBase + valorExtrasUnitario;
+    // Total da linha
+    double valorTotalLinha = precoUnitarioCheio * (item.quantidade ?? 1);
 
     return Dismissible(
       key: Key("item_${item.codigo}_${DateTime.now().millisecondsSinceEpoch}"),
@@ -272,16 +301,17 @@ class _CategoriaPageState extends State<CategoriaPage> {
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 15),
           child: const Icon(Icons.delete, color: Colors.red)),
+      confirmDismiss: (direction) async {
+        return await _confirmarExclusao(context);
+      },
       onDismissed: (_) => controller.removeItemCarrinho(item),
       child: Material(
-        color: Colors
-            .transparent, // Necessário para o InkWell não cobrir o fundo ou ser coberto
+        color: Colors.transparent,
         child: InkWell(
-          // AÇÃO DE TOQUE: Abre os complementos
           onTap: () {
             showDialog(
                 context: context,
-                builder: (context) => SelecaoComplementoWidget(item: item));
+                builder: (context) => SelecaoOpcoesProdutoWidget(item: item));
           },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -294,7 +324,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
               children: [
                 Row(
                   children: [
-                    // NOME DO PRODUTO
                     Expanded(
                       child: Text(
                         item.nome ?? 'Produto',
@@ -304,38 +333,36 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-
                     const SizedBox(width: 8),
-
-                    // BOTÃO DE REMOVER (Fica fora do InkWell para não abrir o modal ao remover)
                     IconButton(
                       icon: const Icon(Icons.close,
                           color: Colors.redAccent, size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
-                      onPressed: () => controller.removeItemCarrinho(item),
+                      onPressed: () async {
+                        bool confirmar = await _confirmarExclusao(context);
+                        if (confirmar) {
+                          controller.removeItemCarrinho(item);
+                        }
+                      },
                     ),
                   ],
                 ),
-
-                // QUANTIDADE E PREÇO
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                          "${item.quantidade}x  ${_formatMoeda.format(item.valor)}",
+                          "${item.quantidade}x  ${_formatMoeda.format(precoUnitarioCheio)}",
                           style:
                               TextStyle(color: Colors.grey[600], fontSize: 13)),
-                      Text(_formatMoeda.format(totalFinal),
+                      Text(_formatMoeda.format(valorTotalLinha),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                     ],
                   ),
                 ),
-
-                // LISTA DE COMPLEMENTOS (VISUALIZAÇÃO)
                 if (item.complementos != null && item.complementos!.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
@@ -352,13 +379,14 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text("+ ${c.quantidade}x ${c.nome}",
-                                        style: TextStyle(
-                                            color: Colors.black87,
-                                            fontSize: 12)),
+                                    Flexible(
+                                        child: Text("+ ${c.nome}",
+                                            style: TextStyle(
+                                                color: Colors.black87,
+                                                fontSize: 12),
+                                            overflow: TextOverflow.ellipsis)),
                                     Text(
-                                        _formatMoeda
-                                            .format(c.valor * c.quantidade),
+                                        "${c.quantidade}x ${_formatMoeda.format(c.valor)}",
                                         style: TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
@@ -368,8 +396,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                           .toList(),
                     ),
                   ),
-
-                // OBSERVAÇÕES
                 if (item.obs != null && item.obs!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -393,7 +419,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     );
   }
 
-  // Sidebar Comanda
   Widget _buildComandaSidebar() {
     return Consumer<ComandaController>(
       builder: (context, controller, _) {
