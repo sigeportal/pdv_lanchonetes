@@ -1,14 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:lanchonete/Controller/Comanda.Controller.dart';
-
-import 'package:lanchonete/Controller/Mesas.Controller.dart';
-import 'package:lanchonete/Pages/Principal_page.dart';
-import 'package:lanchonete/Services/ComandaService.dart';
-import 'package:provider/provider.dart';
 
 class TelaCarregamento extends StatefulWidget {
-  final int comanda;
-  final int mesa;
   final String messageAwait;
   final String messageSuccess;
   final String messageError;
@@ -16,8 +8,6 @@ class TelaCarregamento extends StatefulWidget {
 
   const TelaCarregamento({
     Key? key,
-    required this.comanda,
-    required this.mesa,
     required this.messageAwait,
     required this.messageSuccess,
     required this.messageError,
@@ -31,7 +21,6 @@ class TelaCarregamento extends StatefulWidget {
 class _TelaCarregamentoState extends State<TelaCarregamento> {
   bool isLoading = false;
   bool isSuccess = false;
-  final comandaService = ComandaService();
 
   _aguardando() {
     return Column(
@@ -84,55 +73,14 @@ class _TelaCarregamentoState extends State<TelaCarregamento> {
     );
   }
 
-  _finalizarComanda() {
-    comandaService.encerrarComanda(widget.comanda).then((value) {
-      setState(() {
-        isLoading = false;
-        isSuccess = value;
-      });
-    });
-  }
-
-  _criarComanda() async {
-    var comandaController =
-        Provider.of<ComandaController>(context, listen: false);
-    var result = await comandaController.insereComanda(widget.mesa);
-    if (result) {
-      MesaController.instance.atualizar.value = true;
-      Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(
-        builder: (_) {
-          return PrincipalPage(paginas: Paginas.mesas);
-        },
-      ), (route) => false);
-      final snackbar =
-          const SnackBar(content: Text('Comanda inserida com sucesso!'));
-      ScaffoldMessenger.of(context).showSnackBar(snackbar);
-      setState(() {
-        isLoading = false;
-        isSuccess = true;
-      });
-    }
-  }
-
   @override
   void initState() {
     super.initState();
     isLoading = true;
-    if (widget.finalization) {
-      _finalizarComanda();
-    } else {
-      _criarComanda();
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isSuccess) {
-      Future.delayed(Duration(seconds: 1), () {
-        MesaController.instance.atualizar.value = true;
-        Navigator.pop(context);
-      });
-    }
     return Material(
       child: Center(
         child: Container(

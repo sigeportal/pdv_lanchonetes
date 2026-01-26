@@ -146,7 +146,7 @@ class _LoginPageState extends State<LoginPage> {
                   context,
                   CupertinoPageRoute(
                     builder: (_) => PrincipalPage(
-                      paginas: Paginas.mesas,
+                      paginas: Paginas.categorias,
                     ),
                   ),
                 );

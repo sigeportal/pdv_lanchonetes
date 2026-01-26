@@ -9,11 +9,8 @@ import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
 import 'package:provider/provider.dart';
 
 class CarrinhoPage extends StatefulWidget {
-  final int mesa;
-
   CarrinhoPage({
     Key? key,
-    required this.mesa,
   }) : super(key: key);
 
   @override
@@ -58,8 +55,6 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
                           messageSuccess: 'Comanda enviada com sucesso!',
                           messageError: 'Erro ao enviar comanda!',
                           finalization: false,
-                          mesa: widget.mesa,
-                          comanda: 0,
                         ),
                       ),
                     );
@@ -206,7 +201,7 @@ class _CarrinhoPageState extends State<CarrinhoPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Carrinho | Mesa Nº ${widget.mesa.toString().padLeft(2, '0')}',
+          'Carrinho',
         ),
       ),
       body: Column(

@@ -87,9 +87,7 @@ class _HomePageState extends State<HomePage> {
                         Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CategoriaPage(
-                                numeroMesa: numMesa,
-                              ),
+                              builder: (context) => CategoriaPage(),
                             ));
                       },
                       child: Center(

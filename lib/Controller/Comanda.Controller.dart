@@ -9,49 +9,65 @@ import 'package:flutter/cupertino.dart';
 class ComandaController extends ChangeNotifier {
   List<Itens> itens = [];
 
+  // CORREÇÃO: Cálculo do total considerando Quantidade x Valor Unitário
   double get valorComanda {
     double soma = 0;
-    itens.forEach((element) {
-      soma += element.valor!;
-      if (element.complementos!.length > 0) {
-        soma += element.complementos!
+    for (var element in itens) {
+      // Soma valor do item * quantidade
+      soma += (element.valor! * (element.quantidade ?? 1));
+
+      // Soma valor dos complementos (se houver)
+      if (element.complementos != null && element.complementos!.isNotEmpty) {
+        double totalComplementos = element.complementos!
             .map((e) => e.valor * e.quantidade)
-            .reduce((value, value2) => value + value2);
+            .fold(0.0, (a, b) => a + b);
+        soma += totalComplementos;
       }
-    });
+    }
     return soma;
   }
 
   double getQuantidade(int produto) {
     double quantidade = 0;
-    itens.forEach((element) {
+    for (var element in itens) {
       if (element.produto == produto) {
         quantidade += element.quantidade!;
       }
-    });
+    }
     return quantidade;
   }
 
   int get totalItens => itens.length;
   bool get isEmpty => itens.isEmpty;
 
+  // LÓGICA DE SOMAR QUANTIDADE
   void adicionaItem(Produtos produto, String idAgrupamento,
       {GradeProduto? gradeProduto,
       double quantidade = 1.0,
       required int usuario}) {
-    itens.add(
-      Itens(
-        codigo: itens.length + 1,
-        produto: produto.codigo,
-        quantidade: quantidade,
-        valor: produto.valor,
-        nome: produto.nome,
-        grade: produto.grade,
-        gradeProduto: gradeProduto,
-        usuario: usuario,
-        idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
-      ),
-    );
+    // Procura se já existe um item com o mesmo Código e mesmo Agrupamento (Grade)
+    int index = itens.indexWhere((item) =>
+        item.produto == produto.codigo && item.idAgrupamento == idAgrupamento);
+
+    if (index != -1) {
+      // SE JÁ EXISTE: Apenas incrementa a quantidade
+      itens[index].quantidade = (itens[index].quantidade ?? 0) + quantidade;
+    } else {
+      // SE NÃO EXISTE: Cria uma nova linha na lista
+      itens.add(
+        Itens(
+            codigo: itens.length + 1,
+            produto: produto.codigo,
+            quantidade: quantidade,
+            valor: produto.valor, // Mantém o Valor Unitário
+            nome: produto.nome,
+            grade: produto.grade,
+            gradeProduto: gradeProduto,
+            usuario: usuario,
+            idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
+            complementos: []),
+      );
+    }
     notifyListeners();
   }
 
@@ -69,36 +85,47 @@ class ComandaController extends ChangeNotifier {
     if (item.gradeProduto != null) {
       itens.removeWhere((e) => e.idAgrupamento == item.idAgrupamento);
     } else {
-      itens.removeWhere((e) => e.codigo == item.codigo);
+      // Remove o objeto específico da lista
+      itens.remove(item);
     }
     notifyListeners();
   }
 
   void diminuirQuantidade(int? codigo) {
-    var item = itens.firstWhere((e) => e.produto == codigo);
-    item.quantidade = item.quantidade! - 0.5;
-    item.valor = item.valor! * item.quantidade!;
+    // Encontra o item (preferencialmente o último adicionado ou pelo index)
+    // Para simplificar, pega o primeiro que encontrar desse produto
+    var index = itens.indexWhere((e) => e.produto == codigo);
+
+    if (index != -1) {
+      var item = itens[index];
+      if ((item.quantidade ?? 0) > 1) {
+        item.quantidade = item.quantidade! - 1.0;
+      } else {
+        // Se chegar a 1 e diminuir, remove o item
+        itens.removeAt(index);
+      }
+      // OBS: Não alteramos mais o 'item.valor' aqui para preservar o valor unitário
+    }
     notifyListeners();
   }
 
   Future<bool> insereComanda(int? mesa) async {
     final comandaService = ComandaService();
-    //retorno da função
     var resultado = false;
     try {
       var comanda = Comanda();
       comanda.mesa = mesa;
       comanda.valor = valorComanda;
       comanda.itens = [...itens];
-      //dados da comanda
+
       var comandaExistente = await comandaService.fetchComanda(mesa);
-      if (comandaExistente.itens!.length == 0) {
+      if (comandaExistente.itens == null || comandaExistente.itens!.isEmpty) {
         resultado = await comandaService.criaComanda(comanda);
       } else {
         resultado = await comandaService.atualizarComanda(comanda);
       }
+
       if (resultado) {
-        //limpa os itens
         clear();
       }
       return resultado;
@@ -107,16 +134,20 @@ class ComandaController extends ChangeNotifier {
     }
   }
 
-  adicionaObservacao(int? codItem, String obs) {
+  void adicionaObservacao(int? codItem, String obs) {
     var indice = itens.indexWhere((element) => element.codigo == codItem);
-    itens[indice].obs = obs;
-    notifyListeners();
+    if (indice != -1) {
+      itens[indice].obs = obs;
+      notifyListeners();
+    }
   }
 
-  adicionaComplementos(int? codItem, List<Complementos> complementos) {
+  void adicionaComplementos(int? codItem, List<Complementos> complementos) {
     var indice = itens.indexWhere((element) => element.codigo == codItem);
-    itens[indice].complementos = complementos;
-    notifyListeners();
+    if (indice != -1) {
+      itens[indice].complementos = complementos;
+      notifyListeners();
+    }
   }
 
   Future<bool> deletarItemComanda(int codigo) async {

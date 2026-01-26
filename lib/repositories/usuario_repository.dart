@@ -15,7 +15,7 @@ class UsuarioRepository {
 
     Dio dio = new Dio(options);
     try {
-      final response = await dio.get('/usuarios');
+      final response = await dio.get('/v1/usuarios');
       final list = response.data as List;
       return list.map((e) => UsuarioModel.fromMap(e)).toList();
     } catch (e) {
@@ -34,7 +34,7 @@ class UsuarioRepository {
 
     Dio dio = new Dio(options);
     try {
-      final response = await dio.post('/login', data: {
+      final response = await dio.post('/v1/login', data: {
         'login': login,
         'senha': senha,
       });

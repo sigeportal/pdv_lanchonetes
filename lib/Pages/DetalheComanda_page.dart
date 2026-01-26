@@ -1,7 +1,6 @@
 import 'package:lanchonete/Components/Item_Lista_widget.dart';
 import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
-import 'package:lanchonete/Controller/Mesas.Controller.dart';
 import 'package:lanchonete/Models/comanda_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Pages/Categoria_page.dart';
@@ -82,7 +81,6 @@ class _DetalheComandaPageState extends State<DetalheComandaPage> {
                   comanda.itens!.remove(item);
                   if (comanda.itens!.length == 0) {
                     Navigator.pop(context);
-                    MesaController.instance.atualizar.value = true;
                   } else {
                     recarregarItens.value = true;
                   }
@@ -178,9 +176,7 @@ class _DetalheComandaPageState extends State<DetalheComandaPage> {
                     messageAwait: 'Aguarde o encerramento...',
                     messageSuccess: 'Encerramento realizado com sucesso...',
                     messageError: 'Erro ao tentar realizar o fechamento!',
-                    comanda: widget.numeroMesa,
                     finalization: true,
-                    mesa: widget.numeroMesa,
                   );
                 }),
               );
@@ -311,7 +307,7 @@ class _DetalheComandaPageState extends State<DetalheComandaPage> {
             onPressed: () {
               Navigator.of(context).push(
                 CupertinoPageRoute(
-                  builder: (_) => CategoriaPage(numeroMesa: widget.numeroMesa),
+                  builder: (_) => CategoriaPage(),
                 ),
               );
             }),

@@ -5,19 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:lanchonete/Components/ProdutoItem.dart';
 import 'package:lanchonete/Models/produtos_model.dart';
 import 'package:lanchonete/Pages/Carrinho_page.dart';
-import 'package:lanchonete/Services/ComandaService.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 
 class ProdutosPage extends StatefulWidget {
   final int? idCategoria;
   final String? categoria;
-  final int mesa;
 
   ProdutosPage({
     Key? key,
     required this.idCategoria,
     required this.categoria,
-    required this.mesa,
   }) : super(key: key);
 
   @override
@@ -26,7 +23,6 @@ class ProdutosPage extends StatefulWidget {
 
 class _ProdutosPageState extends State<ProdutosPage> {
   final produtoService = ProdutosService();
-  final comandaService = ComandaService();
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +30,7 @@ class _ProdutosPageState extends State<ProdutosPage> {
       appBar: AppBar(
         title: Center(
           child: Text(
-            '${widget.categoria!.trim()} | Mesa ${widget.mesa.toString()}',
+            '${widget.categoria!.trim()}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
             ),
@@ -53,7 +49,6 @@ class _ProdutosPageState extends State<ProdutosPage> {
                 var produto = snapshot.data![index];
                 return ProdutoItem(
                   produto: produto,
-                  mesa: widget.mesa,
                   categoria: widget.idCategoria ?? 0,
                 );
               },
@@ -70,14 +65,14 @@ class _ProdutosPageState extends State<ProdutosPage> {
         onPressed: () {
           Navigator.of(context).push(
             CupertinoPageRoute(
-              builder: (_) => CarrinhoPage(mesa: widget.mesa),
+              builder: (_) => CarrinhoPage(),
             ),
           );
         },
         child: IconeCarrinho(
           onClick: () => Navigator.of(context).push(
             CupertinoPageRoute(
-              builder: (_) => CarrinhoPage(mesa: widget.mesa),
+              builder: (_) => CarrinhoPage(),
             ),
           ),
         ),

@@ -1,217 +1,511 @@
-import 'dart:convert';
-
-import 'package:lanchonete/Components/IconeCarrinho.dart';
-import 'package:lanchonete/Components/ProdutoItem.dart';
-import 'package:lanchonete/Controller/Comanda.Controller.dart';
-import 'package:lanchonete/Models/produtos_model.dart';
-import 'package:lanchonete/Pages/Carrinho_page.dart';
-import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-
-import 'package:lanchonete/Models/categoria_model.dart';
-import 'package:lanchonete/Pages/Produtos_page.dart';
-import 'package:lanchonete/Services/CategoriaService.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
+// Imports do seu projeto
+import 'package:lanchonete/Components/ProdutoItem.dart';
+import 'package:lanchonete/Components/complementos_widget.dart';
+import 'package:lanchonete/Controller/Comanda.Controller.dart';
+import 'package:lanchonete/Models/produtos_model.dart';
+import 'package:lanchonete/Models/categoria_model.dart';
+import 'package:lanchonete/Models/itens_model.dart';
+import 'package:lanchonete/Services/ProdutosService.dart';
+import 'package:lanchonete/Services/CategoriaService.dart';
+import 'package:lanchonete/Pages/Carrinho_page.dart';
 
 class CategoriaPage extends StatefulWidget {
-  final int numeroMesa;
-
-  const CategoriaPage({
-    Key? key,
-    required this.numeroMesa,
-  }) : super(key: key);
+  final VoidCallback? onOpenDrawer;
+  const CategoriaPage({Key? key, this.onOpenDrawer}) : super(key: key);
 
   @override
   _CategoriaPageState createState() => _CategoriaPageState();
 }
 
 class _CategoriaPageState extends State<CategoriaPage> {
-  final _isSearching = ValueNotifier<bool>(false);
-  List<Produtos> _listaProdutos = <Produtos>[];
-  final _listaProdutosFiltrada = ValueNotifier<List<Produtos>>([]);
+  // Services
   final _serviceProdutos = ProdutosService();
+  final _formatMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-  Widget _buildCategorias(Categoria item) {
+  // Estado Local
+  List<Categoria> _categorias = [];
+  List<Produtos> _produtos = [];
+  int? _selectedCategoriaId;
+
+  // Controles de Estado UI
+  bool _isLoadingProdutos = false;
+  bool _isLoadingCategorias = true;
+  String? _erroMensagem;
+
+  // Controllers de Scroll
+  final ScrollController _produtosScrollController = ScrollController();
+  final ScrollController _comandaScrollController = ScrollController();
+  final ScrollController _categoriasScrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarDadosIniciais();
+    });
+  }
+
+  @override
+  void dispose() {
+    _produtosScrollController.dispose();
+    _comandaScrollController.dispose();
+    _categoriasScrollController.dispose();
+    super.dispose();
+  }
+
+  // --- LÓGICA DE DADOS ---
+
+  Future<void> _carregarDadosIniciais() async {
+    setState(() {
+      _isLoadingCategorias = true;
+      _erroMensagem = null;
+    });
+
+    try {
+      final categorias = await fetchCategorias();
+      if (mounted) {
+        setState(() {
+          _categorias = categorias;
+          _isLoadingCategorias = false;
+        });
+
+        if (categorias.isNotEmpty) {
+          _selecionarCategoria(categorias[0].codigo);
+        } else {
+          setState(() => _erroMensagem = "Nenhuma categoria encontrada.");
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCategorias = false;
+          _erroMensagem = "Erro de conexão com o servidor.";
+        });
+      }
+    }
+  }
+
+  void _selecionarCategoria(int? idCategoria) async {
+    if (_selectedCategoriaId == idCategoria) return;
+
+    setState(() {
+      _selectedCategoriaId = idCategoria;
+      _isLoadingProdutos = true;
+    });
+
+    try {
+      String filtro = idCategoria != null ? '?categoria=$idCategoria' : '';
+      final produtos = await _serviceProdutos.fetchProdutos(filtro);
+
+      if (mounted) {
+        setState(() {
+          _produtos = produtos;
+          _isLoadingProdutos = false;
+        });
+        if (_produtosScrollController.hasClients) {
+          _produtosScrollController.jumpTo(0);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _produtos = [];
+          _isLoadingProdutos = false;
+        });
+      }
+    }
+  }
+
+  // --- WIDGETS VISUAIS ---
+
+  // Botão de Categoria
+  Widget _buildCategoriaTab(Categoria item) {
+    bool isSelected = _selectedCategoriaId == item.codigo;
     return Padding(
-      padding: EdgeInsets.all(10.0),
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            CupertinoPageRoute(
-              builder: (context) => ProdutosPage(
-                idCategoria: item.codigo,
-                categoria: item.nome,
-                mesa: widget.numeroMesa,
+      padding: const EdgeInsets.only(right: 12, bottom: 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _selecionarCategoria(item.codigo),
+          borderRadius: BorderRadius.circular(30),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.amber[600] : Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                  color: isSelected ? Colors.amber[600]! : Colors.grey[300]!,
+                  width: 1.5),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                          color: Colors.amber.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3))
+                    ]
+                  : [],
+            ),
+            child: Center(
+              child: Text(
+                item.nome ?? '',
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
             ),
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10.0),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black,
-                offset: Offset(4.0, 4.0),
-                blurRadius: 5.0,
-                spreadRadius: 1.0,
-              )
-            ],
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10.0),
-                ),
-                child: FutureBuilder<String?>(
-                  future: fetchFotoCategoria(item.codigo),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      return ClipRRect(
-                        borderRadius: BorderRadius.circular(10.0),
-                        child: Image.memory(
-                          base64Decode(snapshot.data!),
-                          fit: BoxFit.cover,
-                        ),
-                      );
-                    } else {
-                      return Center(
-                          child: CircularProgressIndicator(
-                        backgroundColor: Colors.amber,
-                      ));
-                    }
-                  },
-                ),
-              ),
-              Container(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.all(Radius.circular(8.0)),
-                        color: Colors.black87),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        item.nome!,
-                        style: TextStyle(
-                            fontSize: item.nome!.length > 8 ? 18 : 25,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _cabecalho() {
-    return ValueListenableBuilder(
-      valueListenable: _isSearching,
-      builder: (_, dynamic value, __) {
-        return !_isSearching.value
-            ? Center(
-                child: Text(
-                  'Categorias | Mesa N° ${widget.numeroMesa.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
+  // Área Esquerda: Catálogo
+  Widget _buildCatalogoArea() {
+    if (_erroMensagem != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 60, color: Colors.grey),
+            const SizedBox(height: 10),
+            Text(_erroMensagem!),
+            const SizedBox(height: 10),
+            ElevatedButton(
+                onPressed: _carregarDadosIniciais,
+                child: const Text("Tentar Novamente"))
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        Container(
+          height: 80,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+          color: const Color(0xFFF5F5F7),
+          child: _isLoadingCategorias
+              ? const Center(child: CircularProgressIndicator())
+              : Scrollbar(
+                  controller: _categoriasScrollController,
+                  thumbVisibility: true,
+                  trackVisibility: true,
+                  thickness: 6.0,
+                  radius: const Radius.circular(10),
+                  child: ListView.builder(
+                    controller: _categoriasScrollController,
+                    scrollDirection: Axis.horizontal,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: _categorias.length,
+                    itemBuilder: (context, index) =>
+                        _buildCategoriaTab(_categorias[index]),
                   ),
+                ),
+        ),
+        Expanded(
+          child: Container(
+            color: const Color(0xFFF5F5F7),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _isLoadingProdutos
+                ? Center(
+                    child: CircularProgressIndicator(color: Colors.amber[700]))
+                : _produtos.isEmpty
+                    ? const Center(
+                        child: Text("Nenhum produto nesta categoria"))
+                    : Scrollbar(
+                        controller: _produtosScrollController,
+                        thumbVisibility: true,
+                        radius: const Radius.circular(8),
+                        child: GridView.builder(
+                          controller: _produtosScrollController,
+                          padding: const EdgeInsets.only(
+                              bottom: 40, top: 10, left: 4, right: 4),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 380,
+                            childAspectRatio: 0.8,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                          itemCount: _produtos.length,
+                          itemBuilder: (context, index) {
+                            return ProdutoItem(
+                              produto: _produtos[index],
+                              categoria: _selectedCategoriaId ?? 0,
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Item da Comanda (Direita) - MODIFICADO
+  Widget _buildComandaItem(Itens item, ComandaController controller) {
+    double totalItem = item.valor ?? 0;
+    double totalComplementos = 0;
+
+    if (item.complementos != null) {
+      for (var comp in item.complementos!) {
+        totalComplementos += (comp.valor * comp.quantidade);
+      }
+    }
+    // Cálculo correto do total visual da linha
+    double totalFinal =
+        (totalItem * (item.quantidade ?? 1)) + totalComplementos;
+
+    return Dismissible(
+      key: Key("item_${item.codigo}_${DateTime.now().millisecondsSinceEpoch}"),
+      direction: DismissDirection.endToStart,
+      background: Container(
+          color: Colors.red[100],
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 15),
+          child: const Icon(Icons.delete, color: Colors.red)),
+      onDismissed: (_) => controller.removeItemCarrinho(item),
+      child: Material(
+        color: Colors
+            .transparent, // Necessário para o InkWell não cobrir o fundo ou ser coberto
+        child: InkWell(
+          // AÇÃO DE TOQUE: Abre os complementos
+          onTap: () {
+            showDialog(
+                context: context,
+                builder: (context) => SelecaoComplementoWidget(item: item));
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: const BoxDecoration(
+              border:
+                  Border(bottom: BorderSide(color: Colors.black12, width: 0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    // NOME DO PRODUTO
+                    Expanded(
+                      child: Text(
+                        item.nome ?? 'Produto',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // BOTÃO DE REMOVER (Fica fora do InkWell para não abrir o modal ao remover)
+                    IconButton(
+                      icon: const Icon(Icons.close,
+                          color: Colors.redAccent, size: 20),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => controller.removeItemCarrinho(item),
+                    ),
+                  ],
+                ),
+
+                // QUANTIDADE E PREÇO
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                          "${item.quantidade}x  ${_formatMoeda.format(item.valor)}",
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 13)),
+                      Text(_formatMoeda.format(totalFinal),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                    ],
+                  ),
+                ),
+
+                // LISTA DE COMPLEMENTOS (VISUALIZAÇÃO)
+                if (item.complementos != null && item.complementos!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: item.complementos!
+                          .map((c) => Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text("+ ${c.quantidade}x ${c.nome}",
+                                        style: TextStyle(
+                                            color: Colors.black87,
+                                            fontSize: 12)),
+                                    Text(
+                                        _formatMoeda
+                                            .format(c.valor * c.quantidade),
+                                        style: TextStyle(
+                                            color: Colors.black54,
+                                            fontSize: 12)),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+
+                // OBSERVAÇÕES
+                if (item.obs != null && item.obs!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.note, size: 14, color: Colors.amber),
+                        const SizedBox(width: 4),
+                        Text(item.obs!,
+                            style: TextStyle(
+                                color: Colors.amber[900],
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Sidebar Comanda
+  Widget _buildComandaSidebar() {
+    return Consumer<ComandaController>(
+      builder: (context, controller, _) {
+        double totalItens = controller.itens
+            .fold(0, (sum, item) => sum + (item.quantidade ?? 0));
+
+        return Container(
+          width: 360,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+            ],
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.amber[500],
+                child: Row(
+                  children: [
+                    const Icon(Icons.receipt_long, color: Colors.white),
+                    const SizedBox(width: 10),
+                    const Text("PEDIDO ATUAL",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                          totalItens % 1 == 0
+                              ? totalItens.toInt().toString()
+                              : totalItens.toStringAsFixed(1),
+                          style: TextStyle(
+                              color: Colors.amber[800],
+                              fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+              ),
+              Expanded(
+                child: controller.isEmpty
+                    ? Center(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.shopping_basket_outlined,
+                            size: 50, color: Colors.grey[300]),
+                        Text("Carrinho Vazio",
+                            style: TextStyle(color: Colors.grey[400]))
+                      ]))
+                    : Scrollbar(
+                        controller: _comandaScrollController,
+                        thumbVisibility: true,
+                        child: ListView.builder(
+                          controller: _comandaScrollController,
+                          itemCount: controller.itens.length,
+                          itemBuilder: (context, index) => _buildComandaItem(
+                              controller.itens[index], controller),
+                        ),
+                      ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    border:
+                        const Border(top: BorderSide(color: Colors.black12))),
+                child: Column(
+                  children: [
+                    Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("TOTAL",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey)),
+                          Text(_formatMoeda.format(controller.valorComanda),
+                              style: const TextStyle(
+                                  fontSize: 22, fontWeight: FontWeight.bold))
+                        ]),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600]),
+                        onPressed: controller.isEmpty
+                            ? null
+                            : () {
+                                Navigator.push(
+                                    context,
+                                    CupertinoPageRoute(
+                                        builder: (_) => CarrinhoPage()));
+                              },
+                        child: const Text("FINALIZAR",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  ],
                 ),
               )
-            : TextFormField(
-                onChanged: _pesquisaProdutos,
-                autofocus: true,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-                decoration: InputDecoration(
-                  suffix: IconButton(
-                    icon: Icon(Icons.cancel),
-                    onPressed: () {
-                      _isSearching.value = false;
-                    },
-                  ),
-                ),
-              );
-      },
-    );
-  }
-
-  Widget _bodyCategoria() {
-    return FutureBuilder<List<Categoria>>(
-      future: fetchCategorias(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          return GridView.builder(
-            itemCount: snapshot.data!.length,
-            itemBuilder: (context, index) {
-              return _buildCategorias(snapshot.data![index]);
-            },
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-            ),
-          );
-        } else {
-          if (snapshot.hasError) {
-            final snackBar = SnackBar(
-                content: Text(
-                    'Erro ao buscar categorias!\n Verifique a configuração do Servidor Local!'));
-            ScaffoldMessenger.of(context).showSnackBar(snackBar);
-            return snackBar;
-          } else {
-            return Center(
-                child: CircularProgressIndicator(
-              backgroundColor: Colors.amber[400],
-            ));
-          }
-        }
-      },
-    );
-  }
-
-  _pesquisaProdutos(String texto) {
-    _listaProdutosFiltrada.value = [];
-    if (texto.length > 1) {
-      _listaProdutosFiltrada.value = _listaProdutos
-          .where(
-            (e) => e.nome.toUpperCase().contains(texto.toUpperCase()),
-          )
-          .toList();
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _serviceProdutos
-        .fetchProdutos('')
-        .then((value) => _listaProdutos = _listaProdutosFiltrada.value = value);
-  }
-
-  Widget _bodyPesquisaProduto() {
-    return ValueListenableBuilder<List<Produtos>>(
-      valueListenable: _listaProdutosFiltrada,
-      builder: (context, produtos, _) {
-        return ListView(
-          children: produtos
-              .map((item) => ProdutoItem(
-                    produto: item,
-                    mesa: widget.numeroMesa,
-                    categoria: item.categoria,
-                  ))
-              .toList(),
+            ],
+          ),
         );
       },
     );
@@ -219,57 +513,40 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        var controller = Provider.of<ComandaController>(context, listen: false);
-        var cartIsEmpty = controller.isEmpty;
-        if (cartIsEmpty) {
-          Navigator.pop(context);
-          return;
-        } else {
-          final snackBar = SnackBar(
-              content: Text(
-                  'Não é possível sair da tela enquanto houver produtos na mesa!'));
-          ScaffoldMessenger.of(context).showSnackBar(snackBar);
-          return;
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: _cabecalho(),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.search),
-              onPressed: () {
-                _isSearching.value = !_isSearching.value;
-              },
-            ),
-          ],
-        ),
-        body: ValueListenableBuilder(
-          valueListenable: _isSearching,
-          builder: (context, dynamic searching, _) {
-            return !searching ? _bodyCategoria() : _bodyPesquisaProduto();
-          },
-        ),
-        floatingActionButton: FloatingActionButton(
-          backgroundColor: Colors.amber[500],
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F7),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 1,
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.black87),
           onPressed: () {
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (_) => CarrinhoPage(mesa: widget.numeroMesa),
-              ),
-            );
+            if (widget.onOpenDrawer != null) {
+              widget.onOpenDrawer!();
+            } else {
+              try {
+                Scaffold.of(context).openDrawer();
+              } catch (_) {}
+            }
           },
-          child: IconeCarrinho(
-            onClick: () => Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (_) => CarrinhoPage(mesa: widget.numeroMesa),
-              ),
-            ),
-          ),
         ),
+        title: const Text("PDV / Vendas",
+            style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
+        centerTitle: true,
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.grey),
+              onPressed: _carregarDadosIniciais),
+        ],
+      ),
+      body: Row(
+        children: [
+          Expanded(child: _buildCatalogoArea()),
+          _buildComandaSidebar(),
+        ],
       ),
     );
   }
