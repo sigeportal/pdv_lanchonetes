@@ -70,7 +70,7 @@ class _ProdutoItemState extends State<ProdutoItem> {
             children: [
               // 1. ÁREA DA IMAGEM
               Expanded(
-                flex: 60, // Aumentei um pouco a área da imagem
+                flex: 40, // Aumentei um pouco a área da imagem
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.grey[100],
