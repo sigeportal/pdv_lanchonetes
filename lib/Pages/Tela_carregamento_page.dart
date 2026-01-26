@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:lanchonete/Controller/Comanda.Controller.dart';
+import 'package:provider/provider.dart';
 
 class TelaCarregamento extends StatefulWidget {
   final String messageAwait;
@@ -20,7 +23,7 @@ class TelaCarregamento extends StatefulWidget {
 
 class _TelaCarregamentoState extends State<TelaCarregamento> {
   bool isLoading = false;
-  bool isSuccess = false;
+  bool isSuccess = true;
 
   _aguardando() {
     return Column(
@@ -81,6 +84,17 @@ class _TelaCarregamentoState extends State<TelaCarregamento> {
 
   @override
   Widget build(BuildContext context) {
+    if (isSuccess) {
+      Future.delayed(Duration(seconds: 1), () {
+        //MesaController.instance.atualizar.value = true;
+        //Navigator.pop(context);
+        final comandaController =
+            Provider.of<ComandaController>(context, listen: false);
+        comandaController.clear();
+        Get.toNamed('/principal');
+      });
+    }
+
     return Material(
       child: Center(
         child: Container(

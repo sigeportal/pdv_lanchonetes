@@ -5,6 +5,7 @@ import 'package:lanchonete/Controller/Tef/types/tef_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/card_type.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/currency_code.dart';
@@ -106,6 +107,14 @@ class _PaymentModePageState extends State<PaymentModePage> {
                   child: ListView(
                     children: [
                       PaymentOptionTile(
+                        icon: Icons.monetization_on_sharp,
+                        title: "Dinheiro",
+                        subtitle: "Á Vista",
+                        color: Colors.blue,
+                        onPressed: onClickButtonDinheiro,
+                      ),
+                      const SizedBox(height: 12),
+                      PaymentOptionTile(
                         icon: Icons.credit_card,
                         title: "Débito",
                         subtitle: "Cartão de débito",
@@ -166,7 +175,53 @@ class _PaymentModePageState extends State<PaymentModePage> {
     );
   }
 
+  _confirmarFechamento(String formaPagto) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(
+          'Deseja finalizar a venda na Forma de pagamento "$formaPagto"?',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) {
+                  return TelaCarregamento(
+                    messageAwait: 'Aguarde, finalizando venda...',
+                    messageSuccess: 'Venda finalizada com sucesso...',
+                    messageError: 'Erro ao finalizar venda, tente novamente...',
+                    finalization: true,
+                  );
+                }),
+              );
+            },
+            child: Text(
+              'Confirmar',
+              style: TextStyle(color: Colors.green),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Métodos onClick
+  void onClickButtonDinheiro() async {
+    await _confirmarFechamento('Dinheiro');
+  }
 
   void onClickButtonDebito() async {
     TransacaoRequisicaoVenda transacao = TransacaoRequisicaoVenda(
@@ -207,7 +262,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
   // Métodos auxiliares
 
   void navegarParaTelaAnterior() {
-    Get.back();
+    Get.offAndToNamed('/principal');
   }
 
   Future<void> pagar(TransacaoRequisicaoVenda transacao) async {

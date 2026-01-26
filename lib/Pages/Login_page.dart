@@ -54,49 +54,54 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.black,
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(5.0),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  margin: EdgeInsets.only(top: 50),
-                  height: 200,
-                  child: Image.asset('assets/images/logo.png'),
-                ),
-                SizedBox(
-                  height: 20,
-                ),
-                CustomDropDown(),
-                SizedBox(
-                  height: 20,
-                ),
-                Container(
-                  color: Colors.amber,
-                  child: TextFormField(
-                    controller: controllerSenha,
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: 'Senha',
-                      border: OutlineInputBorder(),
+            child: Center(
+              child: SizedBox(
+                width: 500,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      margin: EdgeInsets.only(top: 5),
+                      height: 200,
+                      child: Image.asset('assets/images/logo.png'),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'A senha é obrigatória';
-                      }
-                      return null;
-                    },
-                  ),
+                    SizedBox(
+                      height: 20,
+                    ),
+                    CustomDropDown(),
+                    SizedBox(
+                      height: 20,
+                    ),
+                    Container(
+                      color: Colors.amber,
+                      child: TextFormField(
+                        controller: controllerSenha,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          hintText: 'Senha',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'A senha é obrigatória';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      height: 20,
+                    ),
+                    _buildButtonAcessar(context, _formKey),
+                    SizedBox(
+                      height: 20,
+                    )
+                  ],
                 ),
-                SizedBox(
-                  height: 20,
-                ),
-                _buildButtonAcessar(context, _formKey),
-                SizedBox(
-                  height: 20,
-                )
-              ],
+              ),
             ),
           ),
         ),

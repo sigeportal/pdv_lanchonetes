@@ -3,6 +3,7 @@ import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Controller/Theme.Controller.dart';
 import 'package:lanchonete/Controller/usuario_controller.dart';
+import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeController = Provider.of<ThemeController>(context);
     return GetMaterialApp(
+      onDispose: () {
+        debugPrint("GetMaterialApp onDispose");
+        Get.delete<TefController>();
+      },
+      initialBinding: BindingsBuilder(() {
+        Get.put(TefController(), permanent: true);
+      }),
       title: 'Lanchonete',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -80,14 +88,26 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: LoginPage(),
-      routes: {
-        '/payment_mode': (context) {
-          final args = ModalRoute.of(context)!.settings.arguments
-              as Map<String, dynamic>;
-          return PaymentModePage(valorPagamento: args['valorPagamento']);
-        },
-      },
+      initialRoute: '/login',
+      getPages: [
+        GetPage(
+          name: '/login',
+          page: () => LoginPage(),
+        ),
+        GetPage(
+          name: '/principal',
+          page: () => CategoriaPage(),
+        ),
+        GetPage(
+          name: '/payment_mode',
+          page: () {
+            final args = Get.arguments as Map<String, dynamic>;
+            return PaymentModePage(
+              valorPagamento: args['valorPagamento'] as double,
+            );
+          },
+        )
+      ],
     );
   }
 }
