@@ -254,10 +254,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                               bottom: 40, top: 10, left: 4, right: 4),
                           gridDelegate:
                               const SliverGridDelegateWithMaxCrossAxisExtent(
-                            // AJUSTE PARA 4 COLUNAS EM TABLET:
-                            // 220px é suficiente para caber ~4 itens em 900px de largura disponível
-                            maxCrossAxisExtent: 220,
-                            // Aspect Ratio menor para o card ficar mais alto (0.75) e acomodar foto/texto
+                            maxCrossAxisExtent: 190,
                             childAspectRatio: 0.75,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
@@ -279,19 +276,20 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
   // --- ITEM DA COMANDA ---
   Widget _buildComandaItem(Itens item, ComandaController controller) {
-    double valorBase = item.valor ?? 0;
-    double valorExtrasUnitario = 0;
+    // Valor Base ORIGINAL do Produto (sem adicionais)
+    double valorBaseUnitario = item.valor ?? 0;
+
+    double valorAdicionaisUnitario = 0;
 
     if (item.complementos != null) {
       for (var comp in item.complementos!) {
-        valorExtrasUnitario += (comp.valor * comp.quantidade);
+        valorAdicionaisUnitario += (comp.valor * comp.quantidade);
       }
     }
 
-    // Valor total de UMA unidade completa
-    double precoUnitarioCheio = valorBase + valorExtrasUnitario;
-    // Total da linha
-    double valorTotalLinha = precoUnitarioCheio * (item.quantidade ?? 1);
+    // Valor Total da Linha ( (Base + Extras) * Quantidade )
+    double valorTotalLinha =
+        (valorBaseUnitario + valorAdicionaisUnitario) * (item.quantidade ?? 1);
 
     return Dismissible(
       key: Key("item_${item.codigo}_${DateTime.now().millisecondsSinceEpoch}"),
@@ -353,10 +351,15 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
+                      // LADO ESQUERDO: Apenas o valor do Produto Original
+                      // Ex: 2x R$ 41,00
                       Text(
-                          "${item.quantidade}x  ${_formatMoeda.format(precoUnitarioCheio)}",
+                          "${item.quantidade}x  ${_formatMoeda.format(valorBaseUnitario)}",
                           style:
                               TextStyle(color: Colors.grey[600], fontSize: 13)),
+
+                      // LADO DIREITO: O Total somado com tudo
+                      // Ex: R$ 104,00
                       Text(_formatMoeda.format(valorTotalLinha),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
@@ -380,13 +383,14 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                       MainAxisAlignment.spaceBetween,
                                   children: [
                                     Flexible(
-                                        child: Text("+ ${c.nome}",
+                                        child: Text(
+                                            "+ ${c.nome} (${c.quantidade}x)",
                                             style: TextStyle(
                                                 color: Colors.black87,
                                                 fontSize: 12),
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
-                                        "${c.quantidade}x ${_formatMoeda.format(c.valor)}",
+                                        "${_formatMoeda.format(c.valor * c.quantidade)}",
                                         style: TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
