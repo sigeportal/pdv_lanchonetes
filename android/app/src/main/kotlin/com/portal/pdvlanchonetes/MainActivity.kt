@@ -1,4 +1,4 @@
-package com.example.lanchonete
+package com.portal.pdvlanchonetes
 
 import io.flutter.embedding.android.FlutterActivity
 
