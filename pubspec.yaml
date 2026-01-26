@@ -28,6 +28,13 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # TEF PayGo dependencies
+  paygo_sdk:
+    git:
+      url: https://github.com/doszapro/paygo_sdk.git
+  receive_intent: ^0.2.7
+  fluttertoast: ^8.2.10
+  get: ^4.6.5
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

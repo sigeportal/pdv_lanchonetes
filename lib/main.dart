@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Controller/Theme.Controller.dart';
@@ -6,7 +7,13 @@ import 'package:lanchonete/Pages/Login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'Controller/Tef/paygo_tefcontroller.dart';
+import 'Pages/Payment_mode_page.dart';
+
 void main() {
+  // Inicializa o TefController com GetX
+  Get.put(TefController());
+
   runApp(MultiProvider(
     providers: [
       ChangeNotifierProvider(
@@ -25,7 +32,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeController = Provider.of<ThemeController>(context);
-    return MaterialApp(
+    return GetMaterialApp(
       title: 'Lanchonete',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -74,6 +81,13 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: LoginPage(),
+      routes: {
+        '/payment_mode': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments
+              as Map<String, dynamic>;
+          return PaymentModePage(valorPagamento: args['valorPagamento']);
+        },
+      },
     );
   }
 }

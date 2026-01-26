@@ -519,10 +519,15 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         onPressed: controller.isEmpty
                             ? null
                             : () {
-                                Navigator.push(
-                                    context,
-                                    CupertinoPageRoute(
-                                        builder: (_) => CarrinhoPage()));
+                                Navigator.pop(context);
+                                // Navega para a tela de seleção de pagamento TEF
+                                Navigator.pushNamed(
+                                  context,
+                                  '/payment_mode',
+                                  arguments: {
+                                    'valorPagamento': controller.valorComanda,
+                                  },
+                                );
                               },
                         child: const Text("FINALIZAR",
                             style: TextStyle(
