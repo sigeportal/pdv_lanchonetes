@@ -27,6 +27,8 @@ dependencies:
   provider: ^6.0.0
   flutter:
     sdk: flutter
+  esc_pos_utils_plus: ^2.0.4
+  image: ^4.1.3
 
   # TEF PayGo dependencies
   paygo_sdk:

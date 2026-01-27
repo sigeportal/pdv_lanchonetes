@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:lanchonete/Services/PrinterService.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -520,17 +521,53 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                 backgroundColor: Colors.green[600]),
                             onPressed: controller.isEmpty
                                 ? null
-                                : () {
-                                    Navigator.pop(context);
-                                    // Navega para a tela de seleção de pagamento TEF
-                                    Navigator.pushNamed(
+                                : () async {
+                                    // 1. Navega para pagamento e aguarda retorno
+                                    // Assumindo que CarrinhoPage retorna 'true' se pagou com sucesso
+                                    final resultadoPagamento =
+                                        await Navigator.pushNamed(
                                       context,
-                                      '/payment_mode',
+                                      '/payment_mode', // Ajuste a rota se necessário
                                       arguments: {
                                         'valorPagamento':
                                             controller.valorComanda,
                                       },
                                     );
+
+                                    // 2. Se o pagamento foi bem sucedido (ou se a lógica for imprimir ao voltar)
+                                    // Ajuste a condição conforme o retorno da sua tela de pagamento
+                                    if (resultadoPagamento == null) {
+                                      // Mostra aviso visual
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            "Enviando pedido para a cozinha..."),
+                                        duration: Duration(seconds: 2),
+                                      ));
+
+                                      // 3. Imprime na Cozinha
+                                      bool impresso =
+                                          await KitchenPrinterService
+                                              .imprimirComanda(
+                                                  controller.itens);
+
+                                      if (impresso) {
+                                        controller.clear(); // Limpa carrinho
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              "Pedido impresso e finalizado!"),
+                                          backgroundColor: Colors.green,
+                                        ));
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              "Erro ao imprimir na cozinha! Verifique a rede."),
+                                          backgroundColor: Colors.red,
+                                        ));
+                                      }
+                                    }
                                   },
                             child: const Text("FINALIZAR",
                                 style: TextStyle(
