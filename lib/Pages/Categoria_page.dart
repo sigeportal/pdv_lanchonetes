@@ -12,7 +12,6 @@ import 'package:lanchonete/Models/categoria_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
-import 'package:lanchonete/Pages/Carrinho_page.dart';
 
 class CategoriaPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -218,12 +217,9 @@ class _CategoriaPageState extends State<CategoriaPage> {
           color: const Color(0xFFF5F5F7),
           child: _isLoadingCategorias
               ? const Center(child: CircularProgressIndicator())
-              : Scrollbar(
-                  controller: _categoriasScrollController,
-                  thumbVisibility: true,
-                  trackVisibility: true,
-                  thickness: 6.0,
-                  radius: const Radius.circular(10),
+              : ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context)
+                      .copyWith(scrollbars: false),
                   child: ListView.builder(
                     controller: _categoriasScrollController,
                     scrollDirection: Axis.horizontal,
@@ -434,7 +430,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)
             ],
           ),
           child: Column(
@@ -491,51 +488,59 @@ class _CategoriaPageState extends State<CategoriaPage> {
                       ),
               ),
               Container(
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                     color: Colors.grey[50],
                     border:
                         const Border(top: BorderSide(color: Colors.black12))),
-                child: Column(
-                  children: [
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("TOTAL",
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey)),
-                          Text(_formatMoeda.format(controller.valorComanda),
-                              style: const TextStyle(
-                                  fontSize: 22, fontWeight: FontWeight.bold))
-                        ]),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 45,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green[600]),
-                        onPressed: controller.isEmpty
-                            ? null
-                            : () {
-                                Navigator.pop(context);
-                                // Navega para a tela de seleção de pagamento TEF
-                                Navigator.pushNamed(
-                                  context,
-                                  '/payment_mode',
-                                  arguments: {
-                                    'valorPagamento': controller.valorComanda,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("TOTAL",
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey)),
+                              Text(_formatMoeda.format(controller.valorComanda),
+                                  style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold))
+                            ]),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 45,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green[600]),
+                            onPressed: controller.isEmpty
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    // Navega para a tela de seleção de pagamento TEF
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/payment_mode',
+                                      arguments: {
+                                        'valorPagamento':
+                                            controller.valorComanda,
+                                      },
+                                    );
                                   },
-                                );
-                              },
-                        child: const Text("FINALIZAR",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
-                      ),
-                    )
-                  ],
+                            child: const Text("FINALIZAR",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
                 ),
               )
             ],
