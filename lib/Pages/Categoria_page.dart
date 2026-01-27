@@ -13,6 +13,7 @@ import 'package:lanchonete/Models/categoria_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
+import 'package:lanchonete/Services/CupomFiscalService.dart';
 
 class CategoriaPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -522,50 +523,50 @@ class _CategoriaPageState extends State<CategoriaPage> {
                             onPressed: controller.isEmpty
                                 ? null
                                 : () async {
-                                    // 1. Navega para pagamento e aguarda retorno
-                                    // Assumindo que CarrinhoPage retorna 'true' se pagou com sucesso
+                                    // 1. Gera senha do dia
+                                    int numeroPedido = await OrderNumberService
+                                        .generateNextOrderNumber();
+
+                                    // 2. Vai para pagamento
                                     final resultadoPagamento =
                                         await Navigator.pushNamed(
                                       context,
-                                      '/payment_mode', // Ajuste a rota se necessário
+                                      '/payment_mode',
                                       arguments: {
                                         'valorPagamento':
                                             controller.valorComanda,
                                       },
                                     );
 
-                                    // 2. Se o pagamento foi bem sucedido (ou se a lógica for imprimir ao voltar)
-                                    // Ajuste a condição conforme o retorno da sua tela de pagamento
+                                    // 3. Se pagamento OK (ajuste a condição 'true' conforme seu CarrinhoPage)
                                     if (resultadoPagamento == null) {
-                                      // Mostra aviso visual
                                       ScaffoldMessenger.of(context)
                                           .showSnackBar(const SnackBar(
-                                        content: Text(
-                                            "Enviando pedido para a cozinha..."),
-                                        duration: Duration(seconds: 2),
-                                      ));
+                                              content:
+                                                  Text("Imprimindo Pedido..."),
+                                              duration: Duration(seconds: 2)));
 
-                                      // 3. Imprime na Cozinha
+                                      // 4. Imprime Tudo (Cupom + Cozinha)
                                       bool impresso =
-                                          await KitchenPrinterService
-                                              .imprimirComanda(
-                                                  controller.itens);
+                                          await PrinterService.printOrder(
+                                              itens: controller.itens,
+                                              orderNumber: numeroPedido,
+                                              totalValue:
+                                                  controller.valorComanda);
 
                                       if (impresso) {
-                                        controller.clear(); // Limpa carrinho
+                                        controller.clear();
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              "Pedido impresso e finalizado!"),
-                                          backgroundColor: Colors.green,
-                                        ));
+                                                content: Text(
+                                                    "Pedido Concluído com Sucesso!"),
+                                                backgroundColor: Colors.green));
                                       } else {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(const SnackBar(
-                                          content: Text(
-                                              "Erro ao imprimir na cozinha! Verifique a rede."),
-                                          backgroundColor: Colors.red,
-                                        ));
+                                                content: Text(
+                                                    "Erro de conexão com impressora."),
+                                                backgroundColor: Colors.red));
                                       }
                                     }
                                   },
