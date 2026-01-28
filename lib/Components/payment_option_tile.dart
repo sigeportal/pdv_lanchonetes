@@ -17,8 +17,67 @@ class PaymentOptionTile extends StatelessWidget {
     required this.onPressed,
   }) : super(key: key);
 
+  _listaOptions(bool isHorizontal) {
+    return [
+      Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: color,
+          size: 32,
+        ),
+      ),
+      isHorizontal ? SizedBox(height: 12) : SizedBox(width: 12),
+      Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.black87,
+        ),
+        textAlign: TextAlign.center,
+      ),
+      isHorizontal ? SizedBox(height: 4) : SizedBox(width: 4),
+      Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.black54,
+        ),
+        textAlign: TextAlign.center,
+      ),
+      SizedBox(height: 8),
+      Icon(
+        Icons.arrow_forward_ios,
+        color: Colors.black38,
+        size: 18,
+      ),
+    ];
+  }
+
+  _buildOptions(bool isHorizontal) {
+    if (isHorizontal) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: _listaOptions(isHorizontal),
+      );
+    }
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: _listaOptions(isHorizontal),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final orientation = MediaQuery.of(context).orientation;
+    final isHorizontal = orientation == Orientation.landscape;
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
@@ -36,51 +95,7 @@ class PaymentOptionTile extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 32,
-                ),
-              ),
-              SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.black38,
-                size: 20,
-              ),
-            ],
-          ),
+          child: _buildOptions(isHorizontal),
         ),
       ),
     );

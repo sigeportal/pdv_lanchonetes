@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background preto -->
+  <rect width="512" height="512" fill="#000000"/>
+  
+  <!-- Quadrado amarelo principal (pastel) -->
+  <rect x="150" y="100" width="212" height="212" fill="#FFD700" rx="10"/>
+  
+  <!-- Triângulo do topo esquerdo -->
+  <polygon points="150,80 190,50 190,110" fill="#FFD700"/>
+  
+  <!-- Barra horizontal do topo -->
+  <rect x="200" y="20" width="150" height="50" fill="#FFD700" rx="5"/>
+  
+  <!-- Olhos felizes (arcos) -->
+  <path d="M 190 180 Q 190 200 210 200" stroke="#000000" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <path d="M 302 180 Q 302 200 322 200" stroke="#000000" stroke-width="12" fill="none" stroke-linecap="round"/>
+  
+  <!-- Boca feliz (arco) -->
+  <path d="M 200 250 Q 256 280 312 250" stroke="#000000" stroke-width="12" fill="none" stroke-linecap="round"/>
+  
+  <!-- Texto "pastelaria" -->
+  <text x="256" y="380" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#FFD700" text-anchor="middle" font-style="italic">pastelaria</text>
+  
+  <!-- Texto "ponto de amigos" -->
+  <text x="256" y="435" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="#FFD700" text-anchor="middle" font-style="italic">ponto de amigos</text>
+</svg>

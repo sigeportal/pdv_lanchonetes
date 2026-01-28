@@ -32,6 +32,86 @@ class _PaymentModePageState extends State<PaymentModePage> {
         .replaceAll('.', ',');
   }
 
+  // Método para retornar o widget baseado na orientação
+  Widget _buildPaymentOptions(BuildContext context) {
+    final orientation = MediaQuery.of(context).orientation;
+    final isHorizontal = orientation == Orientation.landscape;
+
+    // Se for horizontal (landscape), usa GridView com 4 colunas
+    if (isHorizontal) {
+      return GridView.count(
+        crossAxisCount: 5,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.95,
+        children: _getPaymentTiles(),
+      );
+    }
+
+    // Se for vertical (portrait), usa ListView com scroll vertical
+    return SingleChildScrollView(
+      child: Column(
+        children: _getPaymentTilesWithSpacing(),
+      ),
+    );
+  }
+
+  // Retorna lista de PaymentOptionTile para GridView
+  List<PaymentOptionTile> _getPaymentTiles() {
+    return [
+      PaymentOptionTile(
+        icon: Icons.monetization_on_sharp,
+        title: "Dinheiro",
+        subtitle: "Á Vista",
+        color: Colors.blue,
+        onPressed: onClickButtonDinheiro,
+      ),
+      PaymentOptionTile(
+        icon: Icons.credit_card,
+        title: "Débito",
+        subtitle: "Cartão de débito",
+        color: Colors.blue,
+        onPressed: onClickButtonDebito,
+      ),
+      PaymentOptionTile(
+        icon: Icons.credit_card,
+        title: "Crédito",
+        subtitle: "Cartão de crédito",
+        color: Colors.green,
+        onPressed: onClickButtonCredito,
+      ),
+      PaymentOptionTile(
+        icon: Icons.card_giftcard,
+        title: "Voucher",
+        subtitle: "Vale alimentação ou refeição",
+        color: Colors.orange,
+        onPressed: onClickButtonVoucher,
+      ),
+      PaymentOptionTile(
+        icon: Icons.account_balance,
+        title: "Carteira Digital",
+        subtitle: "PIX e carteiras virtuais",
+        color: Colors.indigo,
+        onPressed: onClickButtonCarteiraDigital,
+      ),
+    ];
+  }
+
+  // Retorna lista de PaymentOptionTile com espaçamento para ListView
+  List<Widget> _getPaymentTilesWithSpacing() {
+    final tiles = _getPaymentTiles();
+    final tilesWithSpacing = <Widget>[];
+
+    for (int i = 0; i < tiles.length; i++) {
+      tilesWithSpacing.add(tiles[i]);
+      if (i < tiles.length - 1) {
+        tilesWithSpacing.add(const SizedBox(height: 12));
+      }
+    }
+
+    return tilesWithSpacing;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -42,7 +122,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
       body: Container(
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(5),
             child: Column(
               children: [
                 // Seção do valor total
@@ -102,69 +182,32 @@ class _PaymentModePageState extends State<PaymentModePage> {
 
                 const SizedBox(height: 24),
 
-                // Lista de opções de pagamento
+                // Lista de opções de pagamento responsiva
                 Expanded(
-                  child: ListView(
-                    children: [
-                      PaymentOptionTile(
-                        icon: Icons.monetization_on_sharp,
-                        title: "Dinheiro",
-                        subtitle: "Á Vista",
-                        color: Colors.blue,
-                        onPressed: onClickButtonDinheiro,
+                  child: _buildPaymentOptions(context),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Botão cancelar
+                SizedBox(
+                  width: 200,
+                  child: ElevatedButton(
+                    onPressed: navegarParaTelaAnterior,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      const SizedBox(height: 12),
-                      PaymentOptionTile(
-                        icon: Icons.credit_card,
-                        title: "Débito",
-                        subtitle: "Cartão de débito",
-                        color: Colors.blue,
-                        onPressed: onClickButtonDebito,
+                    ),
+                    child: Text(
+                      'Cancelar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
                       ),
-                      const SizedBox(height: 12),
-                      PaymentOptionTile(
-                        icon: Icons.credit_card,
-                        title: "Crédito",
-                        subtitle: "Cartão de crédito",
-                        color: Colors.green,
-                        onPressed: onClickButtonCredito,
-                      ),
-                      const SizedBox(height: 12),
-                      PaymentOptionTile(
-                        icon: Icons.card_giftcard,
-                        title: "Voucher",
-                        subtitle: "Vale alimentação ou refeição",
-                        color: Colors.orange,
-                        onPressed: onClickButtonVoucher,
-                      ),
-                      const SizedBox(height: 12),
-                      PaymentOptionTile(
-                        icon: Icons.account_balance,
-                        title: "Carteira Digital",
-                        subtitle: "PIX e carteiras virtuais",
-                        color: Colors.indigo,
-                        onPressed: onClickButtonCarteiraDigital,
-                      ),
-                      const SizedBox(height: 24),
-                      // Botão cancelar
-                      ElevatedButton(
-                        onPressed: navegarParaTelaAnterior,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancelar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ],
