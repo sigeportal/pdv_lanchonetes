@@ -4,6 +4,7 @@ import 'package:lanchonete/Models/grade_produto_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/produtos_model.dart';
 import 'package:lanchonete/Services/ComandaService.dart';
+import 'package:lanchonete/Services/VendaService.dart';
 import 'package:flutter/cupertino.dart';
 
 class ComandaController extends ChangeNotifier {
@@ -174,6 +175,19 @@ class ComandaController extends ChangeNotifier {
       return result;
     } catch (e) {
       throw Exception(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> inserirVenda(
+      Map<String, dynamic> vendaData) async {
+    final vendaService = VendaService();
+    try {
+      final resultado = await vendaService.inserirVenda(vendaData);
+      clear();
+      notifyListeners();
+      return resultado;
+    } catch (e) {
+      throw Exception('Erro ao inserir venda: $e');
     }
   }
 }

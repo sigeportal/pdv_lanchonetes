@@ -2,6 +2,7 @@ import 'package:lanchonete/Components/generic_dialog.dart';
 import 'package:lanchonete/Components/payment_option_tile.dart';
 import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
 import 'package:lanchonete/Controller/Tef/types/tef_provider.dart';
+import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -13,6 +14,7 @@ import 'package:paygo_sdk/paygo_integrado_uri/domain/types/currency_code.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/fin_type.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/payment_mode.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 class PaymentModePage extends StatefulWidget {
   final double valorPagamento;
@@ -453,7 +455,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
                           onPressed: podeConfirmar
                               ? () {
                                   Navigator.pop(context);
-                                  _confirmarFechamento('Dinheiro');
+                                  _finalizarVenda('Dinheiro');
                                 }
                               : null,
                           icon: Icon(
@@ -512,41 +514,117 @@ class _PaymentModePageState extends State<PaymentModePage> {
     return resultado;
   }
 
-  _confirmarFechamento(String formaPagto) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Finalizar Venda"),
-        content: Text(
-          'Confirma o recebimento e finalização da venda em "$formaPagto"?',
-          style: TextStyle(fontSize: 16),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Voltar', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) {
-                  return TelaCarregamento(
-                    messageAwait: 'Aguarde, finalizando venda...',
-                    messageSuccess: 'Venda finalizada com sucesso...',
-                    messageError: 'Erro ao finalizar venda, tente novamente...',
-                    finalization: true,
-                  );
-                }),
-              );
+  Future<void> _finalizarVenda(String formaPagto) async {
+    try {
+      final comandaController =
+          Provider.of<ComandaController>(context, listen: false);
+
+      // Construir a estrutura de venda conforme o modelo correto
+      final now = DateTime.now();
+      final formattedDate =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      Map<String, dynamic> vendaData = {
+        "Valor": comandaController.valorComanda,
+        "Fun": 1, // ID do funcionário
+        "Diferenca": 0,
+        "Datac": formattedDate,
+        "Cli": 1, // ID do cliente (padrão = 1 para consumidor)
+        "Devolucao_p": "N",
+        "Tipo_pedido": "Venda",
+        "Taxa_entrega": 0,
+        "Forma_pgto": _getFormaPagtoId(formaPagto),
+        "Nome_cliente": "CONSUMIDOR",
+        "Id_pedido": "PED-${formattedDate.replaceAll('-', '')}-001",
+        "Itens": comandaController.itens.map((item) {
+          final valorUnitario = item.valor ?? 0.0;
+          final quantidade = item.quantidade ?? 1.0;
+          final subtotal = valorUnitario * quantidade;
+
+          return {
+            "Valor": valorUnitario,
+            "Quantidade": quantidade,
+            "Pro": item.produto,
+            "Lucro": 10,
+            "Valorr": valorUnitario * 0.8,
+            "Valorl": valorUnitario * 0.9,
+            "Valorf": valorUnitario,
+            "Diferenca": 0,
+            "Liquido": subtotal,
+            "Valor2": subtotal,
+            "Valorcm": 0,
+            "Aliquota": 0,
+            "Gtin": "",
+            "Embalagem": "PC",
+            "Valorb": valorUnitario,
+            "Desconto": 0,
+            "Valorc": valorUnitario * 0.7,
+            "Obs": item.obs ?? "",
+            "Gra": item.grade ?? 0,
+            "Semente_tratada": "N",
+            "Valor_partida": 0,
+            "Variacao": 0,
+            "Usu": 1
+          };
+        }).toList(),
+        "PedFat": {
+          "Codigo": 222,
+          "Data": formattedDate,
+          "Tabela": "VENDAS",
+          "Cod_Ped": 12345,
+          "Campo_Fat": "VEN_FAT",
+          "Campo_Ped": "VEN_CODIGO",
+          "Cliente": "CONSUMIDOR",
+          "Valor": comandaController.valorComanda,
+          "ValorPG": comandaController.valorComanda,
+          "Cod_Cli": 1,
+          "FUN": 1,
+          "Parcelas": 1,
+          "FAT": 1,
+          "ValorB": comandaController.valorComanda,
+          "Desconto": 0,
+          "DataC": formattedDate,
+          "Campo_DataC": "VEN_DATAC",
+          "Tipo": 1,
+          "Ficha": 0,
+          "PFParcelas": [
+            {
+              "Codigo": 1,
+              "PF": 0,
+              "TP": 0,
+              "Valor": comandaController.valorComanda,
+              "Vencimento":
+                  "${now.add(Duration(days: 30)).year}-${(now.add(Duration(days: 30)).month).toString().padLeft(2, '0')}-${(now.add(Duration(days: 30)).day).toString().padLeft(2, '0')}",
+              "Juros": 0,
+              "Descontos": 0,
+              "Duplicata": "1-1/1",
+              "Valorpg": comandaController.valorComanda,
+              "Estado": 1
+            }
+          ]
+        }
+      };
+
+      // Mostrar tela de carregamento
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) {
+          return TelaCarregamento(
+            messageAwait: 'Aguarde, finalizando venda...',
+            messageSuccess: 'Venda finalizada com sucesso...',
+            messageError: 'Erro ao finalizar venda, tente novamente...',
+            finalization: true,
+            onFinalization: () async {
+              final comandaCtrl =
+                  Provider.of<ComandaController>(context, listen: false);
+              return await comandaCtrl.inserirVenda(vendaData);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: Text('Confirmar', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+          );
+        }),
+      );
+    } catch (e) {
+      Fluttertoast.showToast(msg: "Erro: $e");
+    }
   }
 
   // --- Outros métodos de pagamento (mantidos iguais) ---
@@ -690,6 +768,24 @@ class _PaymentModePageState extends State<PaymentModePage> {
       await pagar(transacao);
     } catch (e) {
       Fluttertoast.showToast(msg: "Erro: $e", toastLength: Toast.LENGTH_LONG);
+    }
+  }
+
+  // Mapear forma de pagamento para ID
+  int _getFormaPagtoId(String formaPagto) {
+    switch (formaPagto.toLowerCase()) {
+      case 'dinheiro':
+        return 1;
+      case 'débito':
+        return 2;
+      case 'crédito':
+        return 3;
+      case 'voucher':
+        return 4;
+      case 'carteira digital':
+        return 5;
+      default:
+        return 1; // Padrão: dinheiro
     }
   }
 }
