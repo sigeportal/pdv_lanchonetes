@@ -3,6 +3,7 @@ import 'package:lanchonete/Components/payment_option_tile.dart';
 import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
 import 'package:lanchonete/Controller/Tef/types/tef_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
@@ -11,6 +12,7 @@ import 'package:paygo_sdk/paygo_integrado_uri/domain/types/card_type.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/currency_code.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/fin_type.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/payment_mode.dart';
+import 'package:intl/intl.dart';
 
 class PaymentModePage extends StatefulWidget {
   final double valorPagamento;
@@ -26,6 +28,8 @@ class PaymentModePage extends StatefulWidget {
 
 class _PaymentModePageState extends State<PaymentModePage> {
   final TefController _tefController = Get.find();
+  final NumberFormat _currencyFormat =
+      NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   String _formatPayment() {
     return "R\$ ${widget.valorPagamento.toStringAsFixed(2)}"
@@ -125,7 +129,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
             padding: const EdgeInsets.all(5),
             child: Column(
               children: [
-                // Seção do valor total
+                // Card Valor Total
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(24.0),
@@ -169,7 +173,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
 
                 const SizedBox(height: 24),
 
-                // Título da seção
                 Text(
                   "Escolha a forma de pagamento",
                   style: TextStyle(
@@ -218,25 +221,312 @@ class _PaymentModePageState extends State<PaymentModePage> {
     );
   }
 
+  // --- LÓGICA DO DINHEIRO OTIMIZADA PARA TABLET ---
+
+  void onClickButtonDinheiro() async {
+    await _exibirCalculadoraTroco();
+  }
+
+  Future<void> _exibirCalculadoraTroco() async {
+    final TextEditingController _valorRecebidoController =
+        TextEditingController();
+    double troco = 0.0;
+    List<String> sugestaoCedulas = [];
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        // Usa Dialog normal para ter controle total do tamanho (width/height)
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Container(
+            // Define largura baseada na tela (70% da largura em paisagem)
+            width: MediaQuery.of(context).size.width * 0.7,
+            // Altura máxima para não estourar, mas flexível
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.9,
+              maxWidth: 800, // Limite para telas muito grandes
+            ),
+            padding: const EdgeInsets.all(20),
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                void _calcularTroco(String value) {
+                  if (value.isEmpty) {
+                    setState(() {
+                      troco = 0.0;
+                      sugestaoCedulas = [];
+                    });
+                    return;
+                  }
+                  String cleanValue = value.replaceAll(',', '.');
+                  double? recebido = double.tryParse(cleanValue);
+
+                  if (recebido != null) {
+                    setState(() {
+                      troco = recebido - widget.valorPagamento;
+                      if (troco > 0) {
+                        sugestaoCedulas = _gerarSugestaoCedulas(troco);
+                      } else {
+                        sugestaoCedulas = [];
+                      }
+                    });
+                  }
+                }
+
+                bool podeConfirmar = false;
+                double? valorDigitado = double.tryParse(
+                    _valorRecebidoController.text.replaceAll(',', '.'));
+                if (valorDigitado != null &&
+                    valorDigitado >= widget.valorPagamento - 0.01) {
+                  podeConfirmar = true;
+                }
+
+                // Layout dividido em Row para aproveitar horizontalidade do Tablet
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Título
+                    Row(
+                      children: [
+                        Icon(Icons.calculate, color: Colors.blue, size: 28),
+                        SizedBox(width: 10),
+                        Text("Calculadora de Troco",
+                            style: TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    Divider(),
+                    SizedBox(height: 10),
+
+                    // CORPO DO MODAL (Dividido em 2 colunas)
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // COLUNA DA ESQUERDA (Entrada de Dados)
+                          Expanded(
+                            flex: 4,
+                            child: SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Total da Venda",
+                                      style:
+                                          TextStyle(color: Colors.grey[700])),
+                                  Text(
+                                      _currencyFormat
+                                          .format(widget.valorPagamento),
+                                      style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue[800])),
+                                  SizedBox(height: 30),
+                                  Text("Valor Recebido do Cliente",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                  SizedBox(height: 8),
+                                  TextField(
+                                    controller: _valorRecebidoController,
+                                    keyboardType:
+                                        TextInputType.numberWithOptions(
+                                            decimal: true),
+                                    autofocus: true,
+                                    style: TextStyle(fontSize: 20),
+                                    decoration: InputDecoration(
+                                      prefixText: "R\$ ",
+                                      border: OutlineInputBorder(),
+                                      contentPadding: EdgeInsets.symmetric(
+                                          vertical: 16, horizontal: 12),
+                                      hintText: "0,00",
+                                      helperText: "Digite o valor entregue",
+                                    ),
+                                    onChanged: _calcularTroco,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Divisória Vertical
+                          Container(
+                            width: 1,
+                            color: Colors.grey[300],
+                            margin: EdgeInsets.symmetric(horizontal: 20),
+                          ),
+
+                          // COLUNA DA DIREITA (Resultado e Sugestão)
+                          Expanded(
+                            flex: 5,
+                            child: Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: troco >= 0
+                                    ? Colors.green[50]
+                                    : Colors.red[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: troco >= 0
+                                        ? Colors.green.withOpacity(0.5)
+                                        : Colors.red.withOpacity(0.5)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("Troco a devolver",
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.black54)),
+                                  Text(
+                                    _currencyFormat
+                                        .format(troco < 0 ? 0 : troco),
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                      color: troco >= 0
+                                          ? Colors.green[800]
+                                          : Colors.red[800],
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  if (sugestaoCedulas.isNotEmpty) ...[
+                                    Divider(),
+                                    Text("Sugestão de notas:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    SizedBox(height: 8),
+                                    Expanded(
+                                      child: ListView.builder(
+                                        itemCount: sugestaoCedulas.length,
+                                        itemBuilder: (context, index) {
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 4.0),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.money,
+                                                    size: 18,
+                                                    color: Colors.green[700]),
+                                                SizedBox(width: 8),
+                                                Text(sugestaoCedulas[index],
+                                                    style: TextStyle(
+                                                        fontSize: 16)),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ] else ...[
+                                    Expanded(
+                                        child: Center(
+                                            child: Text("Aguardando valor...",
+                                                style: TextStyle(
+                                                    color: Colors.grey))))
+                                  ]
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 20),
+
+                    // RODAPÉ (Botões)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 16)),
+                          child: Text("Cancelar",
+                              style:
+                                  TextStyle(color: Colors.red, fontSize: 16)),
+                        ),
+                        SizedBox(width: 16),
+                        ElevatedButton.icon(
+                          onPressed: podeConfirmar
+                              ? () {
+                                  Navigator.pop(context);
+                                  _confirmarFechamento('Dinheiro');
+                                }
+                              : null,
+                          icon: Icon(
+                            Icons.check,
+                            color: Colors.white,
+                          ),
+                          label: Text("Finalizar Venda",
+                              style:
+                                  TextStyle(fontSize: 18, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 32, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                      ],
+                    )
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Algoritmo para calcular notas e moedas (Greedy Algorithm)
+  List<String> _gerarSugestaoCedulas(double valorTroco) {
+    List<String> resultado = [];
+    int centavos = (valorTroco * 100).round();
+
+    final Map<int, String> cedulas = {
+      10000: "Nota de R\$ 100,00",
+      5000: "Nota de R\$ 50,00",
+      2000: "Nota de R\$ 20,00",
+      1000: "Nota de R\$ 10,00",
+      500: "Nota de R\$ 5,00",
+      200: "Nota de R\$ 2,00",
+      100: "Moeda de R\$ 1,00",
+      50: "Moeda de R\$ 0,50",
+      25: "Moeda de R\$ 0,25",
+      10: "Moeda de R\$ 0,10",
+      5: "Moeda de R\$ 0,05"
+    };
+
+    for (var valor in cedulas.keys) {
+      if (centavos >= valor) {
+        int qtd = centavos ~/ valor;
+        centavos %= valor;
+        resultado.add("$qtd x ${cedulas[valor]}");
+      }
+    }
+    return resultado;
+  }
+
   _confirmarFechamento(String formaPagto) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        title: Text("Finalizar Venda"),
         content: Text(
-          'Deseja finalizar a venda na Forma de pagamento "$formaPagto"?',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'Confirma o recebimento e finalização da venda em "$formaPagto"?',
+          style: TextStyle(fontSize: 16),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.red),
-            ),
+            onPressed: () => Navigator.pop(context),
+            child: Text('Voltar', style: TextStyle(color: Colors.grey)),
           ),
-          TextButton(
+          ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushReplacement(
@@ -251,20 +541,15 @@ class _PaymentModePageState extends State<PaymentModePage> {
                 }),
               );
             },
-            child: Text(
-              'Confirmar',
-              style: TextStyle(color: Colors.green),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: Text('Confirmar', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  // Métodos onClick
-  void onClickButtonDinheiro() async {
-    await _confirmarFechamento('Dinheiro');
-  }
+  // --- Outros métodos de pagamento (mantidos iguais) ---
 
   void onClickButtonDebito() async {
     TransacaoRequisicaoVenda transacao = TransacaoRequisicaoVenda(
@@ -272,7 +557,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
       ..provider = _tefController.configuracoes.provider.toValue()
       ..cardType = CardType.cartaoDebito
       ..finType = FinType.aVista;
-
     pagar(transacao);
   }
 
@@ -298,11 +582,8 @@ class _PaymentModePageState extends State<PaymentModePage> {
       ..provider = TefProvider.NENHUM.toValue()
       ..finType = FinType.aVista
       ..paymentMode = PaymentMode.pagamentoCarteiraVirtual;
-
     await pagar(transacao);
   }
-
-  // Métodos auxiliares
 
   void navegarParaTelaAnterior() {
     Get.offAndToNamed('/principal');
@@ -312,7 +593,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
     await _tefController.payGORequestHandler.venda(transacao);
   }
 
-  /// Função auxiliar para obter o modo de financiamento
   Future<void> _obterModoDeFinanciamento(
       TransacaoRequisicaoVenda transacao) async {
     FinType currentFinType = await _selecionaFinanciamento();
@@ -333,21 +613,19 @@ class _PaymentModePageState extends State<PaymentModePage> {
         }
         transacao.installments = quantidadeParcelas;
         break;
-
       default:
         transacao.finType = null;
         break;
     }
   }
 
-  // Função auxiliar para selecionar a quantidade de parcelas
   Future<double> _selecionaQuantidadeDeParcelas(double valor) async {
     double quantidadeMaximaDeParcelas = _obterQuantidadeMaximaDeParcelas(valor);
     var parcelas =
         List.generate(quantidadeMaximaDeParcelas.toInt(), (i) => (i + 1))
             .sublist(1);
-
     double quantidadeParcelas = 1.0;
+
     await showGenericDialog<int>(
       context: context,
       title: "Selecione a quantidade de parcelas",
@@ -357,22 +635,19 @@ class _PaymentModePageState extends State<PaymentModePage> {
       onSelected: (value) {
         quantidadeParcelas = value.toDouble();
       },
-      onCancel: () {
-        _onCancelOperation();
-      },
+      onCancel: _onCancelOperation,
     );
     return quantidadeParcelas;
   }
 
-  // Função auxiliar para selecionar a forma de financiamento
   Future<FinType> _selecionaFinanciamento() async {
     var listFinType = {
       FinType.aVista,
       FinType.parceladoEmissor,
       FinType.parceladoEstabelecimento
     };
-
     FinType currenFinType = FinType.financiamentoNaoDefinido;
+
     await showGenericDialog<FinType>(
       context: context,
       title: "Selecione a forma de Financiamento",
@@ -382,31 +657,22 @@ class _PaymentModePageState extends State<PaymentModePage> {
       onSelected: (value) {
         currenFinType = value;
       },
-      onCancel: () {
-        _onCancelOperation();
-      },
+      onCancel: _onCancelOperation,
     );
     return currenFinType;
   }
 
-  /// Função auxiliar para calcular a quantidade máxima de parcelas
   double _obterQuantidadeMaximaDeParcelas(double valor) {
     double valordeParcelaMinimo = 5.00;
     double valorMinimoParcelavel = 2 * valordeParcelaMinimo;
-    double quantidadeMaximaDeParcelas = 99.0;
-
     if (valor < valorMinimoParcelavel) {
       Fluttertoast.showToast(
           msg: "Valor mínimo para parcelamento é R\$ $valorMinimoParcelavel",
           toastLength: Toast.LENGTH_LONG);
       return 1.0;
     }
-    double quantidadeDeParcelas = valor / valordeParcelaMinimo;
-
-    if (quantidadeDeParcelas > quantidadeMaximaDeParcelas) {
-      return quantidadeMaximaDeParcelas;
-    }
-    return quantidadeDeParcelas.floorToDouble();
+    double quantidade = valor / valordeParcelaMinimo;
+    return quantidade > 99.0 ? 99.0 : quantidade.floorToDouble();
   }
 
   void _onCancelOperation() {
@@ -414,7 +680,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
         msg: "Operação cancelada", toastLength: Toast.LENGTH_LONG);
   }
 
-  /// Função auxiliar para pagamento com cartão de crédito
   void _pagamentoCredito(TransacaoRequisicaoVenda transacao) async {
     try {
       await _obterModoDeFinanciamento(transacao);
@@ -424,10 +689,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
       }
       await pagar(transacao);
     } catch (e) {
-      Fluttertoast.showToast(
-          msg: "Erro ao processar pagamento: $e",
-          toastLength: Toast.LENGTH_LONG,
-          fontSize: 16.0);
+      Fluttertoast.showToast(msg: "Erro: $e", toastLength: Toast.LENGTH_LONG);
     }
   }
 }
