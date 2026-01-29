@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
+import 'package:lanchonete/Models/venda_model.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/card_type.dart';
@@ -15,6 +16,9 @@ import 'package:paygo_sdk/paygo_integrado_uri/domain/types/fin_type.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/payment_mode.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
+import '../Services/CupomFiscalService.dart';
+import '../Services/PrinterService.dart';
 
 class PaymentModePage extends StatefulWidget {
   final double valorPagamento;
@@ -615,9 +619,19 @@ class _PaymentModePageState extends State<PaymentModePage> {
             messageError: 'Erro ao finalizar venda, tente novamente...',
             finalization: true,
             onFinalization: () async {
-              final comandaCtrl =
-                  Provider.of<ComandaController>(context, listen: false);
-              return await comandaCtrl.inserirVenda(vendaData);
+              final itens = comandaController.itens;
+              final valorComanda = comandaController.valorComanda;
+              final success = await comandaController.inserirVenda(vendaData);
+              if (success['codigo'] != 0) {
+                int numeroPedido =
+                    await OrderNumberService.generateNextOrderNumber();
+                await PrinterService.printOrder(
+                    itens: itens,
+                    orderNumber: numeroPedido,
+                    totalValue: valorComanda);
+                //limpa o carrinho
+                comandaController.clear();
+              }
             },
           );
         }),

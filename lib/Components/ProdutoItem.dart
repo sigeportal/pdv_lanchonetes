@@ -56,8 +56,10 @@ class _ProdutoItemState extends State<ProdutoItem> {
           onTap: () {
             // Lógica unificada de clique no card
             if (widget.produto!.grade > 0) {
+              // Se houver grade, abrir widget de grade
               _buildGradeProduto(widget.produto!);
             } else {
+              // Senão, adicionar diretamente
               comandaController.adicionaItem(
                 widget.produto!,
                 '',

@@ -183,7 +183,6 @@ class ComandaController extends ChangeNotifier {
     final vendaService = VendaService();
     try {
       final resultado = await vendaService.inserirVenda(vendaData);
-      clear();
       notifyListeners();
       return resultado;
     } catch (e) {

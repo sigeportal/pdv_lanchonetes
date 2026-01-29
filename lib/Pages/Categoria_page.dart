@@ -11,6 +11,7 @@ import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Models/produtos_model.dart';
 import 'package:lanchonete/Models/categoria_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
+import 'package:lanchonete/Models/niveis_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
 import 'package:lanchonete/Services/CupomFiscalService.dart';
@@ -304,10 +305,23 @@ class _CategoriaPageState extends State<CategoriaPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            showDialog(
+          onTap: () async {
+            List<Nivel>? niveis;
+            try {
+              niveis = await _serviceProdutos.getNiveis(item.produto ?? 0);
+            } catch (e) {
+              print('Erro ao buscar niveis: $e');
+            }
+
+            if (mounted) {
+              showDialog(
                 context: context,
-                builder: (context) => SelecaoOpcoesProdutoWidget(item: item));
+                builder: (context) => SelecaoOpcoesProdutoWidget(
+                  item: item,
+                  niveis: niveis,
+                ),
+              );
+            }
           },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -523,13 +537,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
                             onPressed: controller.isEmpty
                                 ? null
                                 : () async {
-                                    // 1. Gera senha do dia
-                                    int numeroPedido = await OrderNumberService
-                                        .generateNextOrderNumber();
-
-                                    // 2. Vai para pagamento
-                                    final resultadoPagamento =
-                                        await Navigator.pushNamed(
+                                    //Vai para pagamento
+                                    await Navigator.pushNamed(
                                       context,
                                       '/payment_mode',
                                       arguments: {
@@ -537,38 +546,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                             controller.valorComanda,
                                       },
                                     );
-
-                                    // 3. Se pagamento OK (ajuste a condição 'true' conforme seu CarrinhoPage)
-                                    if (resultadoPagamento == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(const SnackBar(
-                                              content:
-                                                  Text("Imprimindo Pedido..."),
-                                              duration: Duration(seconds: 2)));
-
-                                      // 4. Imprime Tudo (Cupom + Cozinha)
-                                      bool impresso =
-                                          await PrinterService.printOrder(
-                                              itens: controller.itens,
-                                              orderNumber: numeroPedido,
-                                              totalValue:
-                                                  controller.valorComanda);
-
-                                      if (impresso) {
-                                        controller.clear();
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                                content: Text(
-                                                    "Pedido Concluído com Sucesso!"),
-                                                backgroundColor: Colors.green));
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                                content: Text(
-                                                    "Erro de conexão com impressora."),
-                                                backgroundColor: Colors.red));
-                                      }
-                                    }
                                   },
                             child: const Text("FINALIZAR",
                                 style: TextStyle(

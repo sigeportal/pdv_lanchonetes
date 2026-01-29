@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:lanchonete/Controller/Comanda.Controller.dart';
-import 'package:provider/provider.dart';
 
 class TelaCarregamento extends StatefulWidget {
   final String messageAwait;
@@ -201,9 +199,6 @@ class _TelaCarregamentoState extends State<TelaCarregamento>
     if (isSuccess && !isLoading) {
       Future.delayed(Duration(seconds: 2), () {
         if (mounted) {
-          final comandaController =
-              Provider.of<ComandaController>(context, listen: false);
-          comandaController.clear();
           Get.toNamed('/principal');
         }
       });

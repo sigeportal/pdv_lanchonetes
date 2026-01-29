@@ -4,45 +4,17 @@ import 'package:intl/intl.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/complementos_model.dart';
-
-// Modelos Auxiliares
-class GrupoModificacao {
-  final String titulo;
-  final bool escolhaUnica;
-  final bool obrigatorio;
-  final int maximo;
-  final List<OpcaoModificacao> opcoes;
-
-  GrupoModificacao({
-    required this.titulo,
-    required this.escolhaUnica,
-    this.obrigatorio = false,
-    this.maximo = 1,
-    required this.opcoes,
-  });
-}
-
-class OpcaoModificacao {
-  final int codigo;
-  final String nome;
-  final double valorAdicional;
-  bool selecionado;
-  int quantidade;
-
-  OpcaoModificacao({
-    required this.codigo,
-    required this.nome,
-    required this.valorAdicional,
-    this.selecionado = false,
-    this.quantidade = 0,
-  });
-}
+import 'package:lanchonete/Models/niveis_model.dart';
 
 class SelecaoOpcoesProdutoWidget extends StatefulWidget {
   final Itens item;
+  final List<Nivel>? niveis;
 
-  const SelecaoOpcoesProdutoWidget({Key? key, required this.item})
-      : super(key: key);
+  const SelecaoOpcoesProdutoWidget({
+    Key? key,
+    required this.item,
+    this.niveis,
+  }) : super(key: key);
 
   @override
   _SelecaoOpcoesProdutoWidgetState createState() =>
@@ -53,14 +25,14 @@ class _SelecaoOpcoesProdutoWidgetState
     extends State<SelecaoOpcoesProdutoWidget> {
   final _formatMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-  List<GrupoModificacao> _grupos = [];
+  late List<Nivel> _niveis;
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _keys = [];
 
   @override
   void initState() {
     super.initState();
-    _carregarDadosMockados();
+    _inicializarNiveis();
   }
 
   @override
@@ -69,88 +41,126 @@ class _SelecaoOpcoesProdutoWidgetState
     super.dispose();
   }
 
-  void _carregarDadosMockados() {
-    _grupos = [
-      GrupoModificacao(
-        titulo: "Escolha a Proteína",
-        escolhaUnica: true,
-        obrigatorio: true,
-        opcoes: [
-          OpcaoModificacao(
+  void _inicializarNiveis() {
+    // Se houver niveis fornecidos, usar; senão, criar dados mockados
+    if (widget.niveis != null && widget.niveis!.isNotEmpty) {
+      _niveis = widget.niveis!.map((nivel) {
+        // Criar cópia dos niveis com opções clonadas
+        final novasOpcoes = nivel.opcoes.map((opcao) {
+          return OpcaoNivel(
+            codigo: opcao.codigo,
+            nome: opcao.nome,
+            valorAdicional: opcao.valorAdicional,
+            ativo: opcao.ativo,
+            ativoStr: opcao.ativoStr,
+            codNivel: opcao.codNivel,
+            selecionado: false,
+            quantidade: 0,
+          );
+        }).toList();
+
+        return Nivel(
+          codigo: nivel.codigo,
+          titulo: nivel.titulo,
+          descricao: nivel.descricao,
+          selecaoMin: nivel.selecaoMin,
+          selecaoMax: nivel.selecaoMax,
+          opcoes: novasOpcoes,
+          codProduto: nivel.codProduto,
+        );
+      }).toList();
+    } else {
+      // Dados mockados como fallback
+      _niveis = [
+        Nivel(
+          codigo: 1,
+          titulo: "Escolha a Proteína",
+          descricao: "Selecione a proteína principal",
+          selecaoMin: 1,
+          selecaoMax: 1,
+          opcoes: [
+            OpcaoNivel(
               codigo: 101,
               nome: "Filé de Frango",
               valorAdicional: 0.0,
-              selecionado: true),
-          OpcaoModificacao(
+              ativo: true,
+              ativoStr: "S",
+              codNivel: 1,
+              selecionado: true,
+            ),
+            OpcaoNivel(
               codigo: 102,
               nome: "Filé Mignon",
-              valorAdicional: 8.0), // Valor +8
-          OpcaoModificacao(codigo: 103, nome: "Tilápia", valorAdicional: 4.0),
-        ],
-      ),
-      GrupoModificacao(
-        titulo: "Ponto da Carne",
-        escolhaUnica: true,
-        obrigatorio: true,
-        opcoes: [
-          OpcaoModificacao(codigo: 201, nome: "Ao Ponto", valorAdicional: 0.0),
-          OpcaoModificacao(
-              codigo: 202, nome: "Bem Passada", valorAdicional: 0.0),
-          OpcaoModificacao(
-              codigo: 203, nome: "Mal Passada", valorAdicional: 0.0),
-        ],
-      ),
-      GrupoModificacao(
-        titulo: "Escolha o Molho",
-        escolhaUnica: true,
-        obrigatorio: true,
-        opcoes: [
-          OpcaoModificacao(
-              codigo: 301, nome: "Molho Sugo", valorAdicional: 3.0), // Valor +3
-          OpcaoModificacao(
-              codigo: 302, nome: "Molho Branco", valorAdicional: 0.0),
-          OpcaoModificacao(
-              codigo: 303, nome: "Molho Rosê", valorAdicional: 0.0),
-        ],
-      ),
-      GrupoModificacao(
-        titulo: "Adicionais e Extras",
-        escolhaUnica: false,
-        obrigatorio: false,
-        maximo: 10,
-        opcoes: [
-          OpcaoModificacao(
-              codigo: 1, nome: "Bacon Extra", valorAdicional: 3.50),
-          OpcaoModificacao(
-              codigo: 2, nome: "Queijo Cheddar", valorAdicional: 2.00),
-          OpcaoModificacao(codigo: 3, nome: "Ovo Frito", valorAdicional: 1.50),
-          OpcaoModificacao(
-              codigo: 4, nome: "Arroz Extra", valorAdicional: 4.00),
-          OpcaoModificacao(
-              codigo: 5, nome: "Batata Frita Extra", valorAdicional: 6.00),
-        ],
-      ),
-    ];
-
-    for (var i = 0; i < _grupos.length; i++) {
-      _keys.add(GlobalKey());
+              valorAdicional: 8.0,
+              ativo: true,
+              ativoStr: "S",
+              codNivel: 1,
+            ),
+            OpcaoNivel(
+              codigo: 103,
+              nome: "Tilápia",
+              valorAdicional: 4.0,
+              ativo: true,
+              ativoStr: "S",
+              codNivel: 1,
+            ),
+          ],
+          codProduto: 0,
+        ),
+        Nivel(
+          codigo: 2,
+          titulo: "Ponto da Carne",
+          descricao: "Escolha o ponto desejado",
+          selecaoMin: 1,
+          selecaoMax: 1,
+          opcoes: [
+            OpcaoNivel(
+              codigo: 201,
+              nome: "Ao Ponto",
+              valorAdicional: 0.0,
+              ativo: true,
+              ativoStr: "S",
+              codNivel: 2,
+            ),
+            OpcaoNivel(
+              codigo: 202,
+              nome: "Bem Passada",
+              valorAdicional: 0.0,
+              ativo: true,
+              ativoStr: "S",
+              codNivel: 2,
+            ),
+          ],
+          codProduto: 0,
+        ),
+      ];
     }
 
-    // Restaura seleções anteriores
+    // Restaura seleções anteriores se existirem
     if (widget.item.complementos != null) {
-      for (var salvo in widget.item.complementos!) {
-        for (var grupo in _grupos) {
-          var opcao = grupo.opcoes.firstWhere((o) => o.codigo == salvo.codigo,
-              orElse: () =>
-                  OpcaoModificacao(codigo: -1, nome: '', valorAdicional: 0));
+      _restaurarSelecoes();
+    }
 
-          if (opcao.codigo != -1) {
-            if (grupo.escolhaUnica) {
-              for (var o in grupo.opcoes) o.selecionado = false;
-              opcao.selecionado = true;
-            } else {
-              opcao.quantidade = salvo.quantidade!;
-            }
+    // Gerar chaves para scroll
+    for (var i = 0; i < _niveis.length; i++) {
+      _keys.add(GlobalKey());
+    }
+  }
+
+  void _restaurarSelecoes() {
+    for (var salvo in widget.item.complementos!) {
+      for (var nivel in _niveis) {
+        var indiceOpcao =
+            nivel.opcoes.indexWhere((o) => o.codigo == salvo.codigo);
+        if (indiceOpcao != -1) {
+          var opcao = nivel.opcoes[indiceOpcao];
+          if (nivel.selecaoMax == 1) {
+            // Escolha única
+            for (var o in nivel.opcoes) o.selecionado = false;
+            opcao.selecionado = true;
+          } else {
+            // Múltipla escolha
+            opcao.quantidade = salvo.quantidade ?? 1;
           }
         }
       }
@@ -172,17 +182,17 @@ class _SelecaoOpcoesProdutoWidgetState
     }
   }
 
-  void _selecionarOpcaoUnica(int grupoIndex, OpcaoModificacao opcao) {
+  void _selecionarOpcaoUnica(int nivelIndex, OpcaoNivel opcao) {
     setState(() {
-      final grupo = _grupos[grupoIndex];
-      for (var op in grupo.opcoes) {
+      final nivel = _niveis[nivelIndex];
+      for (var op in nivel.opcoes) {
         op.selecionado = (op == opcao);
       }
     });
-    _rolarParaProximoGrupo(grupoIndex);
+    _rolarParaProximoGrupo(nivelIndex);
   }
 
-  void _atualizarQuantidade(OpcaoModificacao opcao, int delta) {
+  void _atualizarQuantidade(OpcaoNivel opcao, int delta) {
     setState(() {
       int novaQtd = opcao.quantidade + delta;
       if (novaQtd >= 0) {
@@ -193,11 +203,11 @@ class _SelecaoOpcoesProdutoWidgetState
 
   double _calcularTotalAdicionais() {
     double total = 0;
-    for (var grupo in _grupos) {
-      for (var op in grupo.opcoes) {
-        if (grupo.escolhaUnica && op.selecionado) {
+    for (var nivel in _niveis) {
+      for (var op in nivel.opcoes) {
+        if (nivel.selecaoMax == 1 && op.selecionado) {
           total += op.valorAdicional;
-        } else if (!grupo.escolhaUnica && op.quantidade > 0) {
+        } else if (nivel.selecaoMax > 1 && op.quantidade > 0) {
           total += (op.valorAdicional * op.quantidade);
         }
       }
@@ -208,36 +218,42 @@ class _SelecaoOpcoesProdutoWidgetState
   void _salvar() {
     List<Complementos> listaFinal = [];
 
-    // 1. Salva Escolhas Únicas (Radio)
-    for (var grupo in _grupos) {
-      if (grupo.escolhaUnica) {
-        var selecionado = grupo.opcoes.firstWhere((o) => o.selecionado,
-            orElse: () =>
-                OpcaoModificacao(codigo: -1, nome: '', valorAdicional: 0));
+    for (var nivel in _niveis) {
+      if (nivel.selecaoMax == 1) {
+        // Escolha única
+        var selecionado = nivel.opcoes.firstWhere((o) => o.selecionado,
+            orElse: () => OpcaoNivel(
+                  codigo: -1,
+                  nome: '',
+                  valorAdicional: 0,
+                  ativo: false,
+                  ativoStr: 'N',
+                  codNivel: nivel.codigo,
+                ));
 
         if (selecionado.codigo != -1) {
-          // Cria o complemento com o valor correto
           listaFinal.add(Complementos(
-              codigo: selecionado.codigo,
-              nome: "${grupo.titulo}: ${selecionado.nome}",
-              valor: selecionado.valorAdicional, // AQUI ESTÁ O VALOR (+8.00)
-              quantidade: 1));
+            codigo: selecionado.codigo,
+            nome: "${nivel.titulo}: ${selecionado.nome}",
+            valor: selecionado.valorAdicional,
+            quantidade: 1,
+          ));
         }
       } else {
-        // 2. Salva Escolhas Múltiplas (Contador)
-        for (var op in grupo.opcoes) {
+        // Múltipla escolha
+        for (var op in nivel.opcoes) {
           if (op.quantidade > 0) {
             listaFinal.add(Complementos(
-                codigo: op.codigo,
-                nome: op.nome,
-                valor: op.valorAdicional, // AQUI ESTÁ O VALOR (+3.50)
-                quantidade: op.quantidade));
+              codigo: op.codigo,
+              nome: op.nome,
+              valor: op.valorAdicional,
+              quantidade: op.quantidade,
+            ));
           }
         }
       }
     }
 
-    // Envia para o controller atualizar a lista principal
     Provider.of<ComandaController>(context, listen: false)
         .adicionaComplementos(widget.item.codigo, listaFinal);
 
@@ -293,14 +309,14 @@ class _SelecaoOpcoesProdutoWidgetState
               ),
             ),
 
-            // LISTA DE GRUPOS
+            // LISTA DE NIVEIS
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 20),
-                itemCount: _grupos.length,
+                itemCount: _niveis.length,
                 itemBuilder: (context, index) {
-                  return _buildGrupoContainer(index);
+                  return _buildNivelContainer(index);
                 },
               ),
             ),
@@ -362,8 +378,8 @@ class _SelecaoOpcoesProdutoWidgetState
     );
   }
 
-  Widget _buildGrupoContainer(int index) {
-    final grupo = _grupos[index];
+  Widget _buildNivelContainer(int index) {
+    final nivel = _niveis[index];
 
     return Container(
       key: _keys[index],
@@ -381,38 +397,30 @@ class _SelecaoOpcoesProdutoWidgetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      grupo.titulo.toUpperCase(),
+                      nivel.titulo.toUpperCase(),
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.grey[700],
                           fontSize: 13,
                           letterSpacing: 0.5),
                     ),
-                    if (grupo.escolhaUnica)
-                      Text("Escolha 1 opção",
-                          style:
-                              TextStyle(fontSize: 11, color: Colors.grey[500]))
+                    Text(
+                      nivel.descricao,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                    if (nivel.selecaoMin > 0)
+                      Text(
+                        "Mínimo: ${nivel.selecaoMin} | Máximo: ${nivel.selecaoMax}",
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      )
                   ],
                 ),
-                if (grupo.obrigatorio)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: Colors.grey[800],
-                        borderRadius: BorderRadius.circular(4)),
-                    child: const Text("OBRIGATÓRIO",
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold)),
-                  )
               ],
             ),
           ),
-          ...grupo.opcoes.map((opcao) {
-            return grupo.escolhaUnica
-                ? _buildRadioOption(index, grupo, opcao)
+          ...nivel.opcoes.map((opcao) {
+            return nivel.selecaoMax == 1
+                ? _buildRadioOption(index, nivel, opcao)
                 : _buildCounterOption(opcao);
           }).toList(),
           const SizedBox(height: 10),
@@ -421,12 +429,11 @@ class _SelecaoOpcoesProdutoWidgetState
     );
   }
 
-  Widget _buildRadioOption(
-      int grupoIndex, GrupoModificacao grupo, OpcaoModificacao opcao) {
+  Widget _buildRadioOption(int nivelIndex, Nivel nivel, OpcaoNivel opcao) {
     return Material(
       color: Colors.white,
       child: InkWell(
-        onTap: () => _selecionarOpcaoUnica(grupoIndex, opcao),
+        onTap: () => _selecionarOpcaoUnica(nivelIndex, opcao),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
@@ -477,7 +484,7 @@ class _SelecaoOpcoesProdutoWidgetState
     );
   }
 
-  Widget _buildCounterOption(OpcaoModificacao opcao) {
+  Widget _buildCounterOption(OpcaoNivel opcao) {
     bool ativo = opcao.quantidade > 0;
 
     return Container(

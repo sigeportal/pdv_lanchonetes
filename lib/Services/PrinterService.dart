@@ -9,6 +9,7 @@ class PrinterService {
   // Configurações da Impressora
   static const String _printerIp = '10.0.0.22';
   static const int _printerPort = 9100;
+  static const Duration _connectionTimeout = Duration(seconds: 5);
 
   static final _formatMoeda =
       NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
@@ -25,9 +26,10 @@ class PrinterService {
     }
 
     try {
-      print("Conectando à impressora $_printerIp:$_printerPort...");
+      print(
+          "Conectando à impressora $_printerIp:$_printerPort (timeout: $_connectionTimeout)...");
       final socket = await Socket.connect(_printerIp, _printerPort,
-          timeout: const Duration(seconds: 3));
+          timeout: _connectionTimeout);
 
       // --- CORREÇÃO DO LAYOUT 80mm ---
       // O perfil 'XP-N160II' geralmente corrige o problema de margem estreita (58mm)
@@ -58,6 +60,13 @@ class PrinterService {
 
       print("Impressão enviada com sucesso!");
       return true;
+    } on SocketException catch (e) {
+      print("Erro de conexão com a impressora: $e");
+      print("Verifique se:");
+      print("  - O IP da impressora ($_printerIp) está correto");
+      print("  - A impressora está ligada e conectada à rede");
+      print("  - A porta $_printerPort está aberta");
+      return false;
     } catch (e) {
       print("Erro ao imprimir: $e");
       return false;

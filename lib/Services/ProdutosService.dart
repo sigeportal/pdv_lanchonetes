@@ -1,6 +1,7 @@
 import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:lanchonete/Models/grade_produto_model.dart';
 import 'package:lanchonete/Models/produtos_model.dart';
+import 'package:lanchonete/Models/niveis_model.dart';
 import 'package:dio/dio.dart';
 
 class ProdutosService {
@@ -103,6 +104,26 @@ class ProdutosService {
       dio = new Dio(options);
       final response = await dio.get(url);
       return GradeProduto.fromMap(response.data);
+    } catch (e) {
+      throw Exception(e);
+    }
+  }
+
+  Future<List<Nivel>> getNiveis(int codProduto) async {
+    String url = '';
+    try {
+      url = '/Produtos/$codProduto/niveis';
+      final baseurl = await ConfigController.instance.getUrlBase();
+      BaseOptions options = new BaseOptions(
+        baseUrl: baseurl,
+        connectTimeout: Duration(milliseconds: 50000),
+        receiveTimeout: Duration(milliseconds: 50000),
+      );
+
+      dio = new Dio(options);
+      final response = await dio.get(url);
+      final nivelList = response.data as List;
+      return nivelList.map((nivel) => Nivel.fromJson(nivel)).toList();
     } catch (e) {
       throw Exception(e);
     }
