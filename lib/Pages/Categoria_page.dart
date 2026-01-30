@@ -286,6 +286,12 @@ class _CategoriaPageState extends State<CategoriaPage> {
       }
     }
 
+    if (item.opcoesNiveis != null) {
+      for (var op in item.opcoesNiveis!) {
+        valorAdicionaisUnitario += (op.valorAdicional * op.quantidade);
+      }
+    }
+
     // Valor Total da Linha ( (Base + Extras) * Quantidade )
     double valorTotalLinha =
         (valorBaseUnitario + valorAdicionaisUnitario) * (item.quantidade ?? 1);
@@ -403,6 +409,40 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
                                         "${_formatMoeda.format(c.valor * c.quantidade)}",
+                                        style: TextStyle(
+                                            color: Colors.black54,
+                                            fontSize: 12)),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ),
+                if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: item.opcoesNiveis!
+                          .map((c) => Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                        child: Text(
+                                            "+ ${c.nome} (${c.quantidade}x)",
+                                            style: TextStyle(
+                                                color: Colors.black87,
+                                                fontSize: 12),
+                                            overflow: TextOverflow.ellipsis)),
+                                    Text(
+                                        "${_formatMoeda.format(c.valorAdicional * c.quantidade)}",
                                         style: TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),

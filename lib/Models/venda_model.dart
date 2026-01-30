@@ -1,3 +1,7 @@
+// ignore_for_file: public_member_api_docs, sort_constructors_first
+import 'package:lanchonete/Models/complementos_model.dart';
+import 'package:lanchonete/Models/niveis_model.dart';
+
 class Venda {
   final int codigo;
   final DateTime data;
@@ -121,6 +125,8 @@ class ItemVenda {
   final double valor_partida;
   final int variacao;
   final int usu;
+  List<Complementos>? complementos;
+  List<OpcaoNivel>? opcoesNivel;
 
   ItemVenda({
     required this.codigo,
@@ -148,6 +154,8 @@ class ItemVenda {
     required this.valor_partida,
     required this.variacao,
     required this.usu,
+    required this.complementos,
+    required this.opcoesNivel,
   });
 
   factory ItemVenda.fromJson(Map<String, dynamic> json) {
@@ -177,6 +185,11 @@ class ItemVenda {
       valor_partida: (json['valor_partida'] ?? 0).toDouble(),
       variacao: json['variacao'] ?? 0,
       usu: json['usu'] ?? 0,
+      complementos: [],
+      opcoesNivel: (json['opcoesNivel'] as List?)
+              ?.map((e) => OpcaoNivel.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -207,6 +220,10 @@ class ItemVenda {
       'valor_partida': valor_partida,
       'variacao': variacao,
       'usu': usu,
+      'complementos': [],
+      'opcoesNivel': opcoesNivel != null
+          ? opcoesNivel!.map((e) => e.toJson()).toList()
+          : [],
     };
   }
 }
@@ -321,7 +338,7 @@ class PFParcela {
   final int tp;
   final double descontos;
   final int estado;
-  final TipoPagamento tipoPagamento;
+  final TipoPagamento? tipoPagamento;
 
   PFParcela({
     required this.codigo,
@@ -334,7 +351,7 @@ class PFParcela {
     required this.tp,
     required this.descontos,
     required this.estado,
-    required this.tipoPagamento,
+    this.tipoPagamento,
   });
 
   factory PFParcela.fromJson(Map<String, dynamic> json) {
@@ -367,7 +384,7 @@ class PFParcela {
       'tp': tp,
       'descontos': descontos,
       'estado': estado,
-      'tipoPagamento': tipoPagamento.toJson(),
+      'tipoPagamento': tipoPagamento?.toJson(),
     };
   }
 }

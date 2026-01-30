@@ -1,5 +1,6 @@
 import 'package:lanchonete/Models/complementos_model.dart';
 import 'package:lanchonete/Models/grade_produto_model.dart';
+import 'package:lanchonete/Models/niveis_model.dart';
 
 class Itens {
   int? codigo;
@@ -11,6 +12,7 @@ class Itens {
   String? nome;
   int? grade;
   List<Complementos>? complementos;
+  List<OpcaoNivel>? opcoesNiveis;
   int? id;
   GradeProduto? gradeProduto;
   int? usuario;
@@ -25,6 +27,7 @@ class Itens {
       this.obs,
       this.nome,
       this.complementos,
+      this.opcoesNiveis,
       this.codigo,
       this.grade,
       this.gradeProduto,
@@ -32,6 +35,9 @@ class Itens {
       this.idAgrupamento}) {
     if (this.complementos == null) {
       this.complementos = <Complementos>[];
+    }
+    if (this.opcoesNiveis == null) {
+      this.opcoesNiveis = <OpcaoNivel>[];
     }
   }
 
@@ -51,6 +57,9 @@ class Itens {
       complementos: (json['complementos'] as List)
           .map((e) => Complementos.fromJson(e))
           .toList(),
+      opcoesNiveis: (json['opcoesNivel'] as List)
+          .map((e) => OpcaoNivel.fromJson(e))
+          .toList(),
       usuario: json['usuario'],
       idAgrupamento: json['idAgrupamento'],
     );
@@ -69,6 +78,9 @@ class Itens {
       "gradeProduto": gradeProduto != null ? gradeProduto!.toJson() : null,
       "complementos": complementos != null
           ? complementos!.map((c) => c.toJson()).toList()
+          : null,
+      "opcoesNivel": opcoesNiveis != null
+          ? opcoesNiveis!.map((c) => c.toJson()).toList()
           : null,
       "usuario": usuario,
       "idAgrupamento": idAgrupamento,

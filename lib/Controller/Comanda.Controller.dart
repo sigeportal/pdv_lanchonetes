@@ -2,6 +2,7 @@ import 'package:lanchonete/Models/comanda_model.dart';
 import 'package:lanchonete/Models/complementos_model.dart';
 import 'package:lanchonete/Models/grade_produto_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
+import 'package:lanchonete/Models/niveis_model.dart';
 import 'package:lanchonete/Models/produtos_model.dart';
 import 'package:lanchonete/Services/ComandaService.dart';
 import 'package:lanchonete/Services/VendaService.dart';
@@ -23,6 +24,14 @@ class ComandaController extends ChangeNotifier {
           double valComp = (comp.valor).toDouble();
           double qtdComp = (comp.quantidade ?? 0).toDouble();
           valorAdicionais += (valComp * qtdComp);
+        }
+      }
+
+      if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
+        for (var op in item.opcoesNiveis!) {
+          double valOp = (op.valorAdicional).toDouble();
+          double qtdOp = (op.quantidade ?? 0).toDouble();
+          valorAdicionais += (valOp * qtdOp);
         }
       }
 
@@ -69,7 +78,8 @@ class ComandaController extends ChangeNotifier {
           gradeProduto: gradeProduto,
           usuario: usuario,
           idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
-          complementos: []),
+          complementos: [],
+          opcoesNiveis: []),
     );
 
     notifyListeners();
@@ -152,6 +162,15 @@ class ComandaController extends ChangeNotifier {
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
       itens[indice].complementos = List.from(complementos);
+      notifyListeners();
+    }
+  }
+
+  void adicionaOpcoesNivel(int? codItem, List<OpcaoNivel> opcoes) {
+    // Busca pelo código único gerado no adicionaItem
+    var indice = itens.indexWhere((element) => element.codigo == codItem);
+    if (indice != -1) {
+      itens[indice].opcoesNiveis = List.from(opcoes);
       notifyListeners();
     }
   }

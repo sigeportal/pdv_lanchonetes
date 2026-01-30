@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Models/itens_model.dart';
-import 'package:lanchonete/Models/complementos_model.dart';
 import 'package:lanchonete/Models/niveis_model.dart';
 
 class SelecaoOpcoesProdutoWidget extends StatefulWidget {
@@ -42,7 +41,7 @@ class _SelecaoOpcoesProdutoWidgetState
   }
 
   void _inicializarNiveis() {
-    // Se houver niveis fornecidos, usar; senão, criar dados mockados
+    // Se houver niveis fornecidos
     if (widget.niveis != null && widget.niveis!.isNotEmpty) {
       _niveis = widget.niveis!.map((nivel) {
         // Criar cópia dos niveis com opções clonadas
@@ -70,74 +69,11 @@ class _SelecaoOpcoesProdutoWidgetState
         );
       }).toList();
     } else {
-      // Dados mockados como fallback
-      _niveis = [
-        Nivel(
-          codigo: 1,
-          titulo: "Escolha a Proteína",
-          descricao: "Selecione a proteína principal",
-          selecaoMin: 1,
-          selecaoMax: 1,
-          opcoes: [
-            OpcaoNivel(
-              codigo: 101,
-              nome: "Filé de Frango",
-              valorAdicional: 0.0,
-              ativo: true,
-              ativoStr: "S",
-              codNivel: 1,
-              selecionado: true,
-            ),
-            OpcaoNivel(
-              codigo: 102,
-              nome: "Filé Mignon",
-              valorAdicional: 8.0,
-              ativo: true,
-              ativoStr: "S",
-              codNivel: 1,
-            ),
-            OpcaoNivel(
-              codigo: 103,
-              nome: "Tilápia",
-              valorAdicional: 4.0,
-              ativo: true,
-              ativoStr: "S",
-              codNivel: 1,
-            ),
-          ],
-          codProduto: 0,
-        ),
-        Nivel(
-          codigo: 2,
-          titulo: "Ponto da Carne",
-          descricao: "Escolha o ponto desejado",
-          selecaoMin: 1,
-          selecaoMax: 1,
-          opcoes: [
-            OpcaoNivel(
-              codigo: 201,
-              nome: "Ao Ponto",
-              valorAdicional: 0.0,
-              ativo: true,
-              ativoStr: "S",
-              codNivel: 2,
-            ),
-            OpcaoNivel(
-              codigo: 202,
-              nome: "Bem Passada",
-              valorAdicional: 0.0,
-              ativo: true,
-              ativoStr: "S",
-              codNivel: 2,
-            ),
-          ],
-          codProduto: 0,
-        ),
-      ];
+      _niveis = [];
     }
 
     // Restaura seleções anteriores se existirem
-    if (widget.item.complementos != null) {
+    if (widget.item.opcoesNiveis != null) {
       _restaurarSelecoes();
     }
 
@@ -148,7 +84,7 @@ class _SelecaoOpcoesProdutoWidgetState
   }
 
   void _restaurarSelecoes() {
-    for (var salvo in widget.item.complementos!) {
+    for (var salvo in widget.item.opcoesNiveis!) {
       for (var nivel in _niveis) {
         var indiceOpcao =
             nivel.opcoes.indexWhere((o) => o.codigo == salvo.codigo);
@@ -216,7 +152,7 @@ class _SelecaoOpcoesProdutoWidgetState
   }
 
   void _salvar() {
-    List<Complementos> listaFinal = [];
+    List<OpcaoNivel> listaFinal = [];
 
     for (var nivel in _niveis) {
       if (nivel.selecaoMax == 1) {
@@ -232,10 +168,13 @@ class _SelecaoOpcoesProdutoWidgetState
                 ));
 
         if (selecionado.codigo != -1) {
-          listaFinal.add(Complementos(
+          listaFinal.add(OpcaoNivel(
             codigo: selecionado.codigo,
             nome: "${nivel.titulo}: ${selecionado.nome}",
-            valor: selecionado.valorAdicional,
+            valorAdicional: selecionado.valorAdicional,
+            codNivel: selecionado.codNivel,
+            ativo: selecionado.ativo,
+            ativoStr: selecionado.ativoStr,
             quantidade: 1,
           ));
         }
@@ -243,10 +182,13 @@ class _SelecaoOpcoesProdutoWidgetState
         // Múltipla escolha
         for (var op in nivel.opcoes) {
           if (op.quantidade > 0) {
-            listaFinal.add(Complementos(
+            listaFinal.add(OpcaoNivel(
               codigo: op.codigo,
               nome: op.nome,
-              valor: op.valorAdicional,
+              valorAdicional: op.valorAdicional,
+              codNivel: op.codNivel,
+              ativo: op.ativo,
+              ativoStr: op.ativoStr,
               quantidade: op.quantidade,
             ));
           }
@@ -255,7 +197,7 @@ class _SelecaoOpcoesProdutoWidgetState
     }
 
     Provider.of<ComandaController>(context, listen: false)
-        .adicionaComplementos(widget.item.codigo, listaFinal);
+        .adicionaOpcoesNivel(widget.item.codigo, listaFinal);
 
     Navigator.pop(context);
   }

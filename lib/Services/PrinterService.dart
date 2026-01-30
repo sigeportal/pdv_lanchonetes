@@ -128,9 +128,16 @@ class PrinterService {
       double qtd = item.quantidade ?? 1;
       double valorBase = item.valor ?? 0;
       double valorAdicionais = 0;
+      //adicionais
       if (item.complementos != null) {
         for (var c in item.complementos!) {
           valorAdicionais += (c.valor * c.quantidade);
+        }
+      }
+      //opcoes
+      if (item.opcoesNiveis != null) {
+        for (var op in item.opcoesNiveis!) {
+          valorAdicionais += (op.valorAdicional * op.quantidade);
         }
       }
       double totalLinha = (valorBase + valorAdicionais) * qtd;
@@ -156,6 +163,14 @@ class PrinterService {
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var c in item.complementos!) {
           bytes += generator.text("   + ${c.quantidade}x ${c.nome}",
+              styles: const PosStyles(
+                  fontType: PosFontType.fontB, align: PosAlign.left));
+        }
+      }
+      // opcoes (Fora da row para não quebrar layout)
+      if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
+        for (var op in item.opcoesNiveis!) {
+          bytes += generator.text("   + ${op.quantidade}x ${op.nome}",
               styles: const PosStyles(
                   fontType: PosFontType.fontB, align: PosAlign.left));
         }
@@ -239,6 +254,17 @@ class PrinterService {
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var c in item.complementos!) {
           bytes += generator.text("  [+] ${c.quantidade}x ${c.nome}",
+              styles: const PosStyles(
+                  height: PosTextSize.size1,
+                  width: PosTextSize.size1,
+                  bold: true));
+        }
+      }
+
+      // opcoes
+      if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
+        for (var op in item.opcoesNiveis!) {
+          bytes += generator.text("  [+] ${op.quantidade}x ${op.nome}",
               styles: const PosStyles(
                   height: PosTextSize.size1,
                   width: PosTextSize.size1,
