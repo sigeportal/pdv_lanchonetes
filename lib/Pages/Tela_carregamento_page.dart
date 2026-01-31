@@ -199,7 +199,7 @@ class _TelaCarregamentoState extends State<TelaCarregamento>
     if (isSuccess && !isLoading) {
       Future.delayed(Duration(seconds: 2), () {
         if (mounted) {
-          Get.toNamed('/principal');
+          Get.offAndToNamed('/principal');
         }
       });
     }
@@ -207,7 +207,7 @@ class _TelaCarregamentoState extends State<TelaCarregamento>
     if (!isSuccess && !isLoading) {
       Future.delayed(Duration(seconds: 3), () {
         if (mounted) {
-          Get.toNamed('/principal');
+          Get.offAndToNamed('/principal');
         }
       });
     }

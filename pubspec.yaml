@@ -81,6 +81,7 @@ flutter:
     - assets/images/4 sabores/2.png
     - assets/images/4 sabores/3.png
     - assets/images/4 sabores/4.png
+    - assets/images/logo_pastelaria.png
     # - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

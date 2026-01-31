@@ -6,6 +6,8 @@ import 'package:lanchonete/Controller/usuario_controller.dart';
 import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Login_page.dart';
 import 'package:flutter/material.dart';
+import 'package:lanchonete/Pages/Principal_page.dart';
+import 'package:lanchonete/Pages/PrintersConfigPage.dart';
 import 'package:provider/provider.dart';
 
 import 'Controller/Tef/paygo_tefcontroller.dart';
@@ -96,7 +98,7 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(
           name: '/principal',
-          page: () => CategoriaPage(),
+          page: () => PrincipalPage(paginas: Paginas.categorias),
         ),
         GetPage(
           name: '/payment_mode',
@@ -106,7 +108,11 @@ class MyApp extends StatelessWidget {
               valorPagamento: args['valorPagamento'] as double,
             );
           },
-        )
+        ),
+        GetPage(
+          name: '/configImpressoras',
+          page: () => PrinterConfigPage(),
+        ),
       ],
     );
   }

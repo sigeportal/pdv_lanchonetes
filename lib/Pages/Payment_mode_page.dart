@@ -555,264 +555,268 @@ class _PaymentModePageState extends State<PaymentModePage> {
         return Dialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: 500,
-              maxHeight: 650,
-            ),
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Ícone de confirmação
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(40),
+          child: SingleChildScrollView(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: 500,
+                maxHeight: 650,
+              ),
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Ícone de confirmação
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(40),
+                    ),
+                    child: Icon(
+                      Icons.check_circle_outline,
+                      size: 50,
+                      color: Colors.blue[700],
+                    ),
                   ),
-                  child: Icon(
-                    Icons.check_circle_outline,
-                    size: 50,
-                    color: Colors.blue[700],
+
+                  const SizedBox(height: 24),
+
+                  // Título
+                  Text(
+                    'Confirmar Pagamento',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                ),
 
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Título
-                Text(
-                  'Confirmar Pagamento',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                const SizedBox(height: 24),
-
-                // Detalhes do pagamento em card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    children: [
-                      // Forma de pagamento
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Forma de Pagamento:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              formaPagamento,
+                  // Detalhes do pagamento em card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      children: [
+                        // Forma de pagamento
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Forma de Pagamento:',
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[800],
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-                      Divider(),
-                      const SizedBox(height: 16),
-
-                      // Valor total
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Cliente:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            cliente,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Divider(),
-                      const SizedBox(height: 16),
-
-                      // Valor total
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Valor Total:',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _currencyFormat
-                                .format(comandaController.valorComanda),
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green[700],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Parcelamento (se houver)
-                      if (pedFat.pFParcelas.length > 1)
-                        Column(
-                          children: [
-                            Divider(),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Parcelamento:',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey[700],
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                formaPagamento,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[800],
                                 ),
-                                Text(
-                                  descricaoParc,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.orange[700],
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
-                    ],
-                  ),
-                ),
 
-                const SizedBox(height: 32),
+                        const SizedBox(height: 16),
+                        Divider(),
+                        const SizedBox(height: 16),
 
-                // Aviso
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber[300]!),
+                        // Valor total
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Cliente:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              cliente,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(),
+                        const SizedBox(height: 16),
+
+                        // Valor total
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Valor Total:',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              _currencyFormat
+                                  .format(comandaController.valorComanda),
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[700],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // Parcelamento (se houver)
+                        if (pedFat.pFParcelas.length > 1)
+                          Column(
+                            children: [
+                              Divider(),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Parcelamento:',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    descricaoParc,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
-                  child: Row(
+
+                  const SizedBox(height: 32),
+
+                  // Aviso
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info, color: Colors.amber[700], size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Verifique os dados antes de confirmar',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.amber[900],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Botões
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.info, color: Colors.amber[700], size: 20),
-                      const SizedBox(width: 12),
+                      // Botão Cancelar
                       Expanded(
-                        child: Text(
-                          'Verifique os dados antes de confirmar',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.amber[900],
-                            fontWeight: FontWeight.w500,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side:
+                                  BorderSide(color: Colors.red[300]!, width: 2),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancelar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[700],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      // Botão Confirmar
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            if (formaPagamento == 'Dinheiro') {
+                              _exibirCalculadoraTroco();
+                            } else {
+                              _finalizarVenda();
+                            }
+                          },
+                          icon: Icon(Icons.check, color: Colors.white),
+                          label: Text(
+                            'Confirmar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Botões
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Botão Cancelar
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.red[300]!, width: 2),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancelar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red[700],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 16),
-
-                    // Botão Confirmar
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          if (formaPagamento == 'Dinheiro') {
-                            _exibirCalculadoraTroco();
-                          } else {
-                            _finalizarVenda();
-                          }
-                        },
-                        icon: Icon(Icons.check, color: Colors.white),
-                        label: Text(
-                          'Confirmar',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green[600],
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );

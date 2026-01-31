@@ -116,6 +116,66 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
+  /// Valida se algum item do carrinho tem valor zerado
+  /// Retorna uma mensagem de erro se houver itens com valor zerado, ou null se tudo está ok
+  String? _validarItensComValorZerado(List<Itens> itens) {
+    for (var item in itens) {
+      double valorBaseUnitario = item.valor ?? 0;
+      double valorAdicionaisUnitario = 0;
+
+      if (item.complementos != null) {
+        for (var comp in item.complementos!) {
+          valorAdicionaisUnitario += (comp.valor * comp.quantidade);
+        }
+      }
+
+      if (item.opcoesNiveis != null) {
+        for (var op in item.opcoesNiveis!) {
+          valorAdicionaisUnitario += (op.valorAdicional * op.quantidade);
+        }
+      }
+
+      double valorTotalUnitario = valorBaseUnitario + valorAdicionaisUnitario;
+
+      // Verificar se o valor total do item é zero
+      if (valorTotalUnitario <= 0) {
+        return 'O item "${item.nome}" tem valor zerado ou inválido. Verifique o preço do produto.';
+      }
+    }
+
+    return null; // Tudo está ok
+  }
+
+  /// Exibe um diálogo de aviso quando há itens com valor zerado
+  Future<void> _exibirAvisoValorZerado(String mensagem) async {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          "Atenção - Valor Inválido",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange),
+        ),
+        content: Text(mensagem),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              "OK",
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<bool> _confirmarExclusao(BuildContext context) async {
     return await showDialog<bool>(
           context: context,
@@ -417,7 +477,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: item.opcoesNiveis!
-                          .map((c) => Padding(
+                          .map((op) => Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: Row(
                                   mainAxisAlignment:
@@ -425,13 +485,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                   children: [
                                     Flexible(
                                         child: Text(
-                                            "+ ${c.nome} (${c.quantidade}x)",
+                                            "+ ${op.nome} (${op.quantidade}x)",
                                             style: const TextStyle(
                                                 color: Colors.black87,
                                                 fontSize: 12),
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
-                                        "${_formatMoeda.format(c.valorAdicional * c.quantidade)}",
+                                        "${_formatMoeda.format(op.valorAdicional * op.quantidade)}",
                                         style: const TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
@@ -565,7 +625,19 @@ class _CategoriaPageState extends State<CategoriaPage> {
                             onPressed: controller.isEmpty
                                 ? null
                                 : () async {
-                                    //Vai para pagamento
+                                    // Validar se algum item tem valor zerado
+                                    String? erroValidacao =
+                                        _validarItensComValorZerado(
+                                            controller.itens);
+
+                                    if (erroValidacao != null) {
+                                      // Exibir aviso e não prosseguir
+                                      await _exibirAvisoValorZerado(
+                                          erroValidacao);
+                                      return;
+                                    }
+
+                                    // Vai para pagamento
                                     await Navigator.pushNamed(
                                       context,
                                       '/payment_mode',

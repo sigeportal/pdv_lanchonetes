@@ -184,7 +184,7 @@ class _SelecaoOpcoesProdutoWidgetState
           if (op.quantidade > 0) {
             listaFinal.add(OpcaoNivel(
               codigo: op.codigo,
-              nome: op.nome,
+              nome: "${nivel.titulo}: ${op.nome}",
               valorAdicional: op.valorAdicional,
               codNivel: op.codNivel,
               ativo: op.ativo,

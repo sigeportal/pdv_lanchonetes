@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
@@ -46,9 +47,7 @@ class _PrinterConfigPageState extends State<PrinterConfigPage> {
         'printer_ip_cozinha', _ipCozinhaController.text.trim());
 
     Fluttertoast.showToast(msg: "Configurações de impressora salvas!");
-
-    // Fecha a tela
-    Navigator.pop(context);
+    Get.offAndToNamed('principal');
   }
 
   @override

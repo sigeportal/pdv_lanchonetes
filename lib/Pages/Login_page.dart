@@ -9,7 +9,6 @@ import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
 import '../Components/customDropDown.dart';
-import '../Components/pastelario_logo.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -67,9 +66,9 @@ class _LoginPageState extends State<LoginPage> {
                     Container(
                       margin: EdgeInsets.only(top: 5),
                       height: 200,
-                      child: PastelarioLogo(
-                        size: 200,
-                        withText: true,
+                      child: Image.asset(
+                        'assets/images/logo_pastelaria.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                     SizedBox(

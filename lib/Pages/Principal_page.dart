@@ -2,11 +2,10 @@ import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Config_page.dart';
 import 'package:lanchonete/Pages/Consulta_Produtos_page.dart';
-import 'package:lanchonete/Pages/Home_page.dart';
 import 'package:lanchonete/Pages/PrintersConfigPage.dart';
 import 'package:flutter/material.dart';
 
-enum Paginas { home, categorias, consultaProdutos, configuracao, impressoras }
+enum Paginas { categorias, consultaProdutos, configuracao, impressoras }
 
 class PrincipalPage extends StatefulWidget {
   final Paginas paginas;
@@ -47,7 +46,6 @@ class _PrincipalPageState extends State<PrincipalPage> {
   Widget build(BuildContext context) {
     // Recriamos a lista no build para garantir que os callbacks estejam sempre atualizados
     final List<Widget> _paginas = <Widget>[
-      HomePage(),
       // AQUI ESTÁ O SEGREDO: Passamos a função _openDrawer atualizada
       CategoriaPage(onOpenDrawer: _openDrawer),
       ConsultaProdutosPage(),
@@ -55,7 +53,7 @@ class _PrincipalPageState extends State<PrincipalPage> {
       PrinterConfigPage()
     ];
 
-    bool isCategoriaPage = _selectedIndex == 1;
+    bool isCategoriaPage = _selectedIndex == 0;
 
     return Scaffold(
       key: _scaffoldKey, // Vincula a chave ao Scaffold
@@ -94,35 +92,29 @@ class _PrincipalPageState extends State<PrincipalPage> {
                 padding: EdgeInsets.zero,
                 children: [
                   _buildDrawerItem(
-                    icon: Icons.home_rounded,
-                    text: 'Home',
+                    icon: Icons.point_of_sale_rounded,
+                    text: 'Realizar Venda',
                     isSelected: _selectedIndex == 0,
                     onTap: () => _onItemTapped(0),
                   ),
                   _buildDrawerItem(
-                    icon: Icons.point_of_sale_rounded,
-                    text: 'Realizar Venda',
-                    isSelected: _selectedIndex == 1,
-                    onTap: () => _onItemTapped(1),
-                  ),
-                  _buildDrawerItem(
                     icon: Icons.price_check_rounded,
                     text: 'Consultar Preço',
-                    isSelected: _selectedIndex == 2,
-                    onTap: () => _onItemTapped(2),
+                    isSelected: _selectedIndex == 1,
+                    onTap: () => _onItemTapped(1),
                   ),
                   const Divider(),
                   _buildDrawerItem(
                     icon: Icons.settings_rounded,
                     text: 'Configurações',
-                    isSelected: _selectedIndex == 3,
-                    onTap: () => _onItemTapped(3),
+                    isSelected: _selectedIndex == 2,
+                    onTap: () => _onItemTapped(2),
                   ),
                   _buildDrawerItem(
                     icon: Icons.print_rounded,
                     text: 'Impressoras',
-                    isSelected: _selectedIndex == 4,
-                    onTap: () => _onItemTapped(4),
+                    isSelected: _selectedIndex == 3,
+                    onTap: () => _onItemTapped(3),
                   ),
                 ],
               ),
@@ -143,7 +135,6 @@ class _PrincipalPageState extends State<PrincipalPage> {
 
   // Lista de Títulos
   final List<String> _titulos = [
-    'Home',
     'Vendas',
     'Consultar Preço',
     'Configurações',
