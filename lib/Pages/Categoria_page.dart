@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:lanchonete/Services/PrinterService.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -14,7 +13,7 @@ import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/niveis_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
-import 'package:lanchonete/Services/CupomFiscalService.dart';
+// import 'package:lanchonete/Services/CupomFiscalService.dart'; // Import opcional
 
 class CategoriaPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -117,7 +116,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
-  // --- FUNÇÃO AUXILIAR DE CONFIRMAÇÃO ---
   Future<bool> _confirmarExclusao(BuildContext context) async {
     return await showDialog<bool>(
           context: context,
@@ -273,11 +271,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
     );
   }
 
-  // --- ITEM DA COMANDA ---
   Widget _buildComandaItem(Itens item, ComandaController controller) {
-    // Valor Base ORIGINAL do Produto (sem adicionais)
     double valorBaseUnitario = item.valor ?? 0;
-
     double valorAdicionaisUnitario = 0;
 
     if (item.complementos != null) {
@@ -292,7 +287,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
       }
     }
 
-    // Valor Total da Linha ( (Base + Extras) * Quantidade )
     double valorTotalLinha =
         (valorBaseUnitario + valorAdicionaisUnitario) * (item.quantidade ?? 1);
 
@@ -369,15 +363,10 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // LADO ESQUERDO: Apenas o valor do Produto Original
-                      // Ex: 2x R$ 41,00
                       Text(
                           "${item.quantidade}x  ${_formatMoeda.format(valorBaseUnitario)}",
                           style:
                               TextStyle(color: Colors.grey[600], fontSize: 13)),
-
-                      // LADO DIREITO: O Total somado com tudo
-                      // Ex: R$ 104,00
                       Text(_formatMoeda.format(valorTotalLinha),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
@@ -403,13 +392,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                     Flexible(
                                         child: Text(
                                             "+ ${c.nome} (${c.quantidade}x)",
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                                 color: Colors.black87,
                                                 fontSize: 12),
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
                                         "${_formatMoeda.format(c.valor * c.quantidade)}",
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
                                   ],
@@ -437,13 +426,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                     Flexible(
                                         child: Text(
                                             "+ ${c.nome} (${c.quantidade}x)",
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                                 color: Colors.black87,
                                                 fontSize: 12),
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
                                         "${_formatMoeda.format(c.valorAdicional * c.quantidade)}",
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
                                   ],
@@ -486,8 +475,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
             ],
           ),
           child: Column(
@@ -615,9 +603,14 @@ class _CategoriaPageState extends State<CategoriaPage> {
         leading: IconButton(
           icon: const Icon(Icons.menu, color: Colors.black87),
           onPressed: () {
+            // CORREÇÃO CRUCIAL PARA TABLET:
+            // Remove o foco do teclado antes de tentar abrir o menu
+            FocusScope.of(context).unfocus();
+
             if (widget.onOpenDrawer != null) {
               widget.onOpenDrawer!();
             } else {
+              // Fallback caso a navegação tenha sido feita incorretamente
               try {
                 Scaffold.of(context).openDrawer();
               } catch (_) {}

@@ -3,10 +3,10 @@ import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Config_page.dart';
 import 'package:lanchonete/Pages/Consulta_Produtos_page.dart';
 import 'package:lanchonete/Pages/Home_page.dart';
+import 'package:lanchonete/Pages/PrintersConfigPage.dart';
 import 'package:flutter/material.dart';
 
-// Enum para facilitar a identificação das páginas
-enum Paginas { home, categorias, consultaProdutos, configuracao }
+enum Paginas { home, categorias, consultaProdutos, configuracao, impressoras }
 
 class PrincipalPage extends StatefulWidget {
   final Paginas paginas;
@@ -14,45 +14,53 @@ class PrincipalPage extends StatefulWidget {
   const PrincipalPage({Key? key, required this.paginas}) : super(key: key);
 
   @override
-  _PrincipalPageState createState() => _PrincipalPageState(paginas.index);
+  _PrincipalPageState createState() => _PrincipalPageState();
 }
 
 class _PrincipalPageState extends State<PrincipalPage> {
-  int _selectedIndex;
+  late int _selectedIndex;
 
-  // Controlador para abrir o Drawer programaticamente
+  // Chave global para controlar o Scaffold (Menu Lateral)
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  _PrincipalPageState(this._selectedIndex);
+  @override
+  void initState() {
+    super.initState();
+    // Inicializa o índice com base no parâmetro passado
+    _selectedIndex = widget.paginas.index;
+  }
 
-  // Lista de Títulos para a AppBar
-  final List<String> _titulos = [
-    'Home',
-    'Vendas',
-    'Consultar Preço',
-    'Configurações'
-  ];
+  // Função segura para abrir o Drawer
+  void _openDrawer() {
+    // Garante que o teclado seja fechado antes de abrir o menu
+    FocusScope.of(context).unfocus();
+
+    // Pequeno delay para garantir que o teclado sumiu e o estado está montado
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scaffoldKey.currentState != null) {
+        _scaffoldKey.currentState!.openDrawer();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Lista das suas páginas
+    // Recriamos a lista no build para garantir que os callbacks estejam sempre atualizados
     final List<Widget> _paginas = <Widget>[
       HomePage(),
-      // CORREÇÃO: Passando o comando para abrir o Drawer do Pai
-      CategoriaPage(
-          onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer()),
+      // AQUI ESTÁ O SEGREDO: Passamos a função _openDrawer atualizada
+      CategoriaPage(onOpenDrawer: _openDrawer),
       ConsultaProdutosPage(),
       ConfigPage(),
+      PrinterConfigPage()
     ];
 
     bool isCategoriaPage = _selectedIndex == 1;
 
     return Scaffold(
-      key: _scaffoldKey, // A chave que controla este Scaffold
-
-      // Se for CategoriaPage, ocultamos a AppBar (ela tem a própria)
+      key: _scaffoldKey, // Vincula a chave ao Scaffold
       appBar: isCategoriaPage
-          ? null
+          ? null // CategoriaPage tem sua própria AppBar
           : AppBar(
               title: Text(
                 _titulos[_selectedIndex],
@@ -63,7 +71,6 @@ class _PrincipalPageState extends State<PrincipalPage> {
               centerTitle: true,
               iconTheme: const IconThemeData(color: Colors.white),
             ),
-
       drawer: Drawer(
         child: Column(
           children: [
@@ -111,6 +118,12 @@ class _PrincipalPageState extends State<PrincipalPage> {
                     isSelected: _selectedIndex == 3,
                     onTap: () => _onItemTapped(3),
                   ),
+                  _buildDrawerItem(
+                    icon: Icons.print_rounded,
+                    text: 'Impressoras',
+                    isSelected: _selectedIndex == 4,
+                    onTap: () => _onItemTapped(4),
+                  ),
                 ],
               ),
             ),
@@ -127,6 +140,15 @@ class _PrincipalPageState extends State<PrincipalPage> {
       body: _paginas.elementAt(_selectedIndex),
     );
   }
+
+  // Lista de Títulos
+  final List<String> _titulos = [
+    'Home',
+    'Vendas',
+    'Consultar Preço',
+    'Configurações',
+    'Impressoras'
+  ];
 
   Widget _buildDrawerItem({
     required IconData icon,
@@ -147,7 +169,6 @@ class _PrincipalPageState extends State<PrincipalPage> {
         ),
       ),
       selected: isSelected,
-      // Correção de compatibilidade: withOpacity é mais seguro que withValues
       selectedTileColor: Constants.primaryColor.withOpacity(0.1),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -163,6 +184,9 @@ class _PrincipalPageState extends State<PrincipalPage> {
     setState(() {
       _selectedIndex = index;
     });
-    Navigator.pop(context);
+    // Fecha o Drawer ao selecionar
+    if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+      Navigator.pop(context);
+    }
   }
 }

@@ -1,98 +1,155 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
-import 'package:lanchonete/Models/itens_model.dart'; // Ajuste conforme seu caminho real
+import 'package:lanchonete/Models/itens_model.dart';
+import 'package:lanchonete/Models/empresa_model.dart'; // Certifique-se de importar o Model criado
+import 'package:lanchonete/Services/EmpresaService.dart'; // Certifique-se de importar o Service criado
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PrinterService {
-  // Configurações da Impressora
-  static const String _printerIp = '10.0.0.22';
   static const int _printerPort = 9100;
-  static const Duration _connectionTimeout = Duration(seconds: 5);
+  // Aumentei um pouco o timeout para dar tempo de conectar em redes lentas
+  static const Duration _connectionTimeout = Duration(seconds: 4);
 
   static final _formatMoeda =
       NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
-  /// Tenta imprimir Cupom + Cozinha
+  /// Tenta imprimir Cupom + Comandas Separadas
   static Future<bool> printOrder(
       {required List<Itens> itens,
       required int orderNumber,
       required double totalValue}) async {
-    // Web não suporta Socket direto
     if (kIsWeb) {
       print("Impressão direta não suportada na Web.");
       return false;
     }
 
-    try {
-      print(
-          "Conectando à impressora $_printerIp:$_printerPort (timeout: $_connectionTimeout)...");
-      final socket = await Socket.connect(_printerIp, _printerPort,
-          timeout: _connectionTimeout);
+    // 1. Carregar Configurações de IP
+    final prefs = await SharedPreferences.getInstance();
+    final ipCaixa = prefs.getString('printer_ip_caixa');
+    final ipCozinha = prefs.getString('printer_ip_cozinha');
 
-      // --- CORREÇÃO DO LAYOUT 80mm ---
-      // O perfil 'XP-N160II' geralmente corrige o problema de margem estreita (58mm)
-      // em impressoras 80mm genéricas (Elgin, XPrinter, etc).
-      CapabilityProfile profile;
-      try {
-        profile = await CapabilityProfile.load(name: 'XP-N160II');
-      } catch (e) {
-        // Se falhar, usa o padrão (pode ficar estreito, mas imprime)
-        profile = await CapabilityProfile.load();
-      }
-
-      // 1. Gera bytes do Cupom do Cliente
-      final List<int> receiptBytes =
-          await _generateReceiptBytes(itens, orderNumber, totalValue, profile);
-
-      // 2. Gera bytes da Via da Cozinha
-      final List<int> kitchenBytes =
-          await _generateKitchenBytes(itens, orderNumber, profile);
-
-      // 3. Combina tudo
-      final List<int> allBytes = [...receiptBytes, ...kitchenBytes];
-
-      // 4. Envia
-      socket.add(Uint8List.fromList(allBytes));
-      await socket.flush();
-      await socket.close();
-
-      print("Impressão enviada com sucesso!");
-      return true;
-    } on SocketException catch (e) {
-      print("Erro de conexão com a impressora: $e");
-      print("Verifique se:");
-      print("  - O IP da impressora ($_printerIp) está correto");
-      print("  - A impressora está ligada e conectada à rede");
-      print("  - A porta $_printerPort está aberta");
-      return false;
-    } catch (e) {
-      print("Erro ao imprimir: $e");
+    if (ipCaixa == null || ipCaixa.isEmpty) {
+      print("ERRO: IP da impressora do caixa não configurado.");
       return false;
     }
+
+    // 2. BUSCAR DADOS DA EMPRESA (API ou Cache)
+    // Isso garante que o título seja dinâmico
+    Empresa dadosEmpresa = await EmpresaService.fetchDadosEmpresa();
+
+    // 3. Carregar Perfil da Impressora
+    CapabilityProfile profile;
+    try {
+      profile = await CapabilityProfile.load(name: 'XP-N160II');
+    } catch (e) {
+      profile = await CapabilityProfile.load();
+    }
+
+    // 4. Separar as Listas (Lógica do Pastel)
+    final List<Itens> listaPasteis = itens.where((item) {
+      final nome = (item.nome ?? '').toLowerCase();
+      return nome.contains('pastel');
+    }).toList();
+
+    final List<Itens> listaGeral = itens.where((item) {
+      final nome = (item.nome ?? '').toLowerCase();
+      return !nome.contains('pastel');
+    }).toList();
+
+    bool sucessoCaixa = false;
+    // Se não tiver pastéis, consideramos a "cozinha" como sucesso (nada a fazer)
+    bool sucessoCozinha = listaPasteis.isEmpty;
+
+    // =========================================================================
+    // IMPRESSÃO 1: CAIXA (Cupom Completo + Produção Geral)
+    // =========================================================================
+    try {
+      print("Conectando ao CAIXA ($ipCaixa)...");
+      final socketCaixa = await Socket.connect(ipCaixa, _printerPort,
+          timeout: _connectionTimeout);
+
+      // A. Gera Cupom do Cliente (COM TODOS OS ITENS e DADOS DA EMPRESA)
+      List<int> bytesCaixa = await _generateReceiptBytes(
+          itens, orderNumber, totalValue, profile, dadosEmpresa);
+
+      // B. Gera Via da Cozinha Geral (Apenas itens que NÃO são pastel)
+      if (listaGeral.isNotEmpty) {
+        final bytesCozinhaGeral = await _generateKitchenBytes(
+            listaGeral, orderNumber, profile,
+            tituloSetor: "COZINHA (GERAL)");
+
+        // Concatena a via da cozinha ao final do cupom do cliente
+        bytesCaixa.addAll(bytesCozinhaGeral);
+      }
+
+      // Envia tudo para o Caixa de uma vez
+      socketCaixa.add(Uint8List.fromList(bytesCaixa));
+      await socketCaixa.flush();
+      await socketCaixa.close();
+      sucessoCaixa = true;
+      print("Impressão CAIXA OK.");
+    } catch (e) {
+      print("ERRO Impressão CAIXA: $e");
+    }
+
+    // =========================================================================
+    // IMPRESSÃO 2: COZINHA/PASTELARIA (Apenas Pastéis)
+    // =========================================================================
+    // Só tenta imprimir se houver pastéis e se o IP estiver configurado
+    if (listaPasteis.isNotEmpty && ipCozinha != null && ipCozinha.isNotEmpty) {
+      try {
+        print("Conectando à COZINHA ($ipCozinha)...");
+        final socketCozinha = await Socket.connect(ipCozinha, _printerPort,
+            timeout: _connectionTimeout);
+
+        final bytesPastelaria = await _generateKitchenBytes(
+            listaPasteis, orderNumber, profile,
+            tituloSetor: "COZINHA (PASTEL)");
+
+        socketCozinha.add(Uint8List.fromList(bytesPastelaria));
+        await socketCozinha.flush();
+        await socketCozinha.close();
+        sucessoCozinha = true;
+        print("Impressão COZINHA OK.");
+      } catch (e) {
+        print("ERRO Impressão COZINHA: $e");
+      }
+    }
+
+    return sucessoCaixa;
   }
 
-  // --- VIA DO CLIENTE (COM PREÇOS) ---
-  static Future<List<int>> _generateReceiptBytes(List<Itens> itens,
-      int orderNumber, double totalValue, CapabilityProfile profile) async {
+  // --- VIA DO CLIENTE (DADOS DINÂMICOS DA EMPRESA) ---
+  static Future<List<int>> _generateReceiptBytes(
+      List<Itens> itens,
+      int orderNumber,
+      double totalValue,
+      CapabilityProfile profile,
+      Empresa empresa) async {
+    // Recebe o objeto Empresa
+
+    print(empresa.titulo1?.toUpperCase());
+
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
 
-    // Reset para limpar configurações anteriores da impressora
     bytes += generator.reset();
 
-    // Cabeçalho
-    // Usamos size2 aqui porque está centralizado e fora de colunas
-    bytes += generator.text('LANCHONETE EXEMPLAR',
+    // --- TÍTULO DINÂMICO ---
+    // titulo1: Nome Fantasia (Ex: "LANCHONETE DO ZÉ")
+    bytes += generator.text(empresa.titulo1?.toUpperCase() ?? 'LANCHONETE',
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
             height: PosTextSize.size2,
             width: PosTextSize.size2));
 
-    bytes += generator.text('Rua das Delicias, 123',
+    // titulo2: Endereço ou Razão Social
+    bytes += generator.text(empresa.titulo2 ?? 'Endereco nao informado',
         styles: const PosStyles(align: PosAlign.center));
+
     bytes += generator.feed(1);
 
     // Senha
@@ -111,9 +168,7 @@ class PrinterService {
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.hr();
 
-    // Tabela de Itens
-    // SOMA DAS LARGURAS (WIDTH) DEVE SER 12
-    // 2 (Qtd) + 6 (Item) + 4 (Total) = 12
+    // Tabela
     bytes += generator.row([
       PosColumn(text: 'Qtd', width: 2, styles: const PosStyles(bold: true)),
       PosColumn(text: 'Item', width: 6, styles: const PosStyles(bold: true)),
@@ -128,13 +183,12 @@ class PrinterService {
       double qtd = item.quantidade ?? 1;
       double valorBase = item.valor ?? 0;
       double valorAdicionais = 0;
-      //adicionais
+
       if (item.complementos != null) {
         for (var c in item.complementos!) {
           valorAdicionais += (c.valor * c.quantidade);
         }
       }
-      //opcoes
       if (item.opcoesNiveis != null) {
         for (var op in item.opcoesNiveis!) {
           valorAdicionais += (op.valorAdicional * op.quantidade);
@@ -142,8 +196,6 @@ class PrinterService {
       }
       double totalLinha = (valorBase + valorAdicionais) * qtd;
 
-      // ATENÇÃO: Nunca use PosTextSize.size2 DENTRO de row(),
-      // pois quebra o alinhamento em muitas impressoras. Use apenas Bold.
       bytes += generator.row([
         PosColumn(
             text: '${qtd.toInt()}x',
@@ -159,7 +211,6 @@ class PrinterService {
             styles: const PosStyles(align: PosAlign.right)),
       ]);
 
-      // Adicionais (Fora da row para não quebrar layout)
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var c in item.complementos!) {
           bytes += generator.text("   + ${c.quantidade}x ${c.nome}",
@@ -167,7 +218,6 @@ class PrinterService {
                   fontType: PosFontType.fontB, align: PosAlign.left));
         }
       }
-      // opcoes (Fora da row para não quebrar layout)
       if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
         for (var op in item.opcoesNiveis!) {
           bytes += generator.text("   + ${op.quantidade}x ${op.nome}",
@@ -179,8 +229,7 @@ class PrinterService {
 
     bytes += generator.hr();
 
-    // Total Final
-    // Aqui voltamos a usar size2 pois temos apenas 2 colunas grandes (6+6)
+    // Total
     bytes += generator.row([
       PosColumn(
           text: 'TOTAL:',
@@ -206,16 +255,17 @@ class PrinterService {
     return bytes;
   }
 
-  // --- VIA DA COZINHA (SEM PREÇOS, FOCO EM LEITURA RÁPIDA) ---
+  // --- VIA DA COZINHA (Layout Otimizado) ---
   static Future<List<int>> _generateKitchenBytes(
-      List<Itens> itens, int orderNumber, CapabilityProfile profile) async {
+      List<Itens> itens, int orderNumber, CapabilityProfile profile,
+      {String tituloSetor = "COZINHA"}) async {
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
 
     bytes += generator.reset();
 
-    // Cabeçalho Cozinha (Invertido para destaque visual)
-    bytes += generator.text('COZINHA',
+    // Cabeçalho Setorizado (Invertido para destaque)
+    bytes += generator.text(tituloSetor,
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
@@ -224,11 +274,10 @@ class PrinterService {
             reverse: true));
     bytes += generator.feed(1);
 
-    // Senha
     bytes += generator.text('PEDIDO: ${orderNumber.toString().padLeft(3, '0')}',
         styles: const PosStyles(
             align: PosAlign.center,
-            height: PosTextSize.size3, // Fonte tripla para ver de longe
+            height: PosTextSize.size3,
             width: PosTextSize.size3,
             bold: true));
 
@@ -237,20 +286,14 @@ class PrinterService {
     bytes += generator.hr(ch: '=');
     bytes += generator.feed(1);
 
-    // Lista de Itens da Cozinha
     for (var item in itens) {
       double qtd = item.quantidade ?? 1;
 
-      // NOTA: Para a cozinha, não usamos colunas (row).
-      // Imprimimos linearmente para permitir nomes longos sem quebra.
-
-      // Formato: 2x X-TUDO ESPECIAL
-      // Usamos apenas Height(altura) dobrada, Width(largura) normal para caber mais texto
+      // Layout Linear: Quantidade e Nome em destaque
       bytes += generator.text('${qtd.toInt()}x ${item.nome?.toUpperCase()}',
           styles: const PosStyles(
               height: PosTextSize.size2, width: PosTextSize.size1, bold: true));
 
-      // Adicionais
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var c in item.complementos!) {
           bytes += generator.text("  [+] ${c.quantidade}x ${c.nome}",
@@ -261,7 +304,6 @@ class PrinterService {
         }
       }
 
-      // opcoes
       if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
         for (var op in item.opcoesNiveis!) {
           bytes += generator.text("  [+] ${op.quantidade}x ${op.nome}",
@@ -272,7 +314,6 @@ class PrinterService {
         }
       }
 
-      // Observações (Fundo preto para chamar atenção do chapeiro)
       if (item.obs != null && item.obs!.isNotEmpty) {
         bytes += generator.feed(1);
         bytes += generator.text("  OBS: ${item.obs}",
@@ -283,7 +324,7 @@ class PrinterService {
     }
 
     bytes += generator.feed(2);
-    bytes += generator.text('*** VIA COZINHA ***',
+    bytes += generator.text('*** VIA PRODUCAO ***',
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.feed(2);
     bytes += generator.cut();
