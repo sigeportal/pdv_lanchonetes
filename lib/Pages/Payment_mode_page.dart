@@ -1,4 +1,3 @@
-import 'package:lanchonete/Components/generic_dialog.dart';
 import 'package:lanchonete/Components/payment_option_tile.dart';
 import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
@@ -8,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:lanchonete/Models/venda_model.dart';
 import 'package:lanchonete/Models/cliente_model.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
+import 'package:lanchonete/Pages/ReimpressaoCupom_page.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -1196,9 +1196,26 @@ class _PaymentModePageState extends State<PaymentModePage> {
                 int numeroPedido =
                     await OrderNumberService.generateNextOrderNumber();
                 await PrinterService.printOrder(
-                    itens: itens,
-                    orderNumber: numeroPedido,
-                    totalValue: valorComanda);
+                  itens: itens,
+                  orderNumber: numeroPedido,
+                  totalValue: valorComanda,
+                );
+
+                // Exibir tela de reimpressão
+                if (mounted) {
+                  await Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => ReimpressaoCupomPage(
+                        itens: itens,
+                        numeroPedido: numeroPedido,
+                        totalValue: valorComanda,
+                      ),
+                    ),
+                    (route) {
+                      return true;
+                    },
+                  );
+                }
                 //limpa o carrinho
                 comandaController.clear();
               }
@@ -1280,44 +1297,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
 
   Future<void> pagar(TransacaoRequisicaoVenda transacao) async {
     await _tefController.payGORequestHandler.venda(transacao);
-  }
-
-  Future<double> _selecionaQuantidadeDeParcelas(double valor) async {
-    double quantidadeMaximaDeParcelas = _obterQuantidadeMaximaDeParcelas(valor);
-    var parcelas = List.generate(quantidadeMaximaDeParcelas.toInt(), (i) => (i))
-        .sublist(1);
-    double quantidadeParcelas = 1.0;
-
-    await showGenericDialog<int>(
-      context: context,
-      title: "Selecione a quantidade de parcelas",
-      options: parcelas,
-      selectedValue: null,
-      displayText: (e) => "$e x",
-      onSelected: (value) {
-        quantidadeParcelas = value.toDouble();
-      },
-      onCancel: _onCancelOperation,
-    );
-    return quantidadeParcelas;
-  }
-
-  double _obterQuantidadeMaximaDeParcelas(double valor) {
-    double valordeParcelaMinimo = 5.00;
-    double valorMinimoParcelavel = 2 * valordeParcelaMinimo;
-    if (valor < valorMinimoParcelavel) {
-      Fluttertoast.showToast(
-          msg: "Valor mínimo para parcelamento é R\$ $valorMinimoParcelavel",
-          toastLength: Toast.LENGTH_LONG);
-      return 1.0;
-    }
-    double quantidade = valor / valordeParcelaMinimo;
-    return quantidade > 99.0 ? 99.0 : quantidade.floorToDouble();
-  }
-
-  void _onCancelOperation() {
-    Fluttertoast.showToast(
-        msg: "Operação cancelada", toastLength: Toast.LENGTH_LONG);
   }
 
   // Mapear forma de pagamento para ID
