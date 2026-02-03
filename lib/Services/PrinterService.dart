@@ -3,13 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:lanchonete/Models/itens_model.dart';
-import 'package:lanchonete/Models/empresa_model.dart'; // Certifique-se de importar o Model criado
-import 'package:lanchonete/Services/EmpresaService.dart'; // Certifique-se de importar o Service criado
+import 'package:lanchonete/Models/empresa_model.dart';
+import 'package:lanchonete/Services/EmpresaService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PrinterService {
   static const int _printerPort = 9100;
-  // Aumentei um pouco o timeout para dar tempo de conectar em redes lentas
   static const Duration _connectionTimeout = Duration(seconds: 4);
 
   static final _formatMoeda =
@@ -35,8 +34,7 @@ class PrinterService {
       return false;
     }
 
-    // 2. BUSCAR DADOS DA EMPRESA (API ou Cache)
-    // Isso garante que o título seja dinâmico
+    // 2. BUSCAR DADOS DA EMPRESA
     Empresa dadosEmpresa = await EmpresaService.fetchDadosEmpresa();
 
     // 3. Carregar Perfil da Impressora
@@ -47,44 +45,58 @@ class PrinterService {
       profile = await CapabilityProfile.load();
     }
 
-    // 4. Separar as Listas (Lógica do Pastel)
-    final List<Itens> listaPasteis = itens.where((item) {
-      final nome = (item.nome ?? '').toLowerCase();
-      return nome.contains('pastel');
-    }).toList();
+    // 4. LÓGICA DE SEPARAÇÃO (Pastel + Bebidas)
 
-    final List<Itens> listaGeral = itens.where((item) {
-      final nome = (item.nome ?? '').toLowerCase();
-      return !nome.contains('pastel');
-    }).toList();
+    // Verifica se existe ALGUM pastel no pedido
+    bool temPastel = itens.any((item) => _isPastel(item));
+
+    List<Itens> itensParaImpressoraGeral = [];
+    List<Itens> itensParaImpressoraPastel = [];
+
+    if (temPastel) {
+      // CENÁRIO A: Tem Pastel
+      // Impressora Pastel: Recebe Pasteis + Bebidas
+      // Impressora Geral: Recebe o Resto (Lanches, Porções, etc)
+
+      itensParaImpressoraPastel = itens.where((item) {
+        return _isPastel(item) || _isBebida(item);
+      }).toList();
+
+      itensParaImpressoraGeral = itens.where((item) {
+        return !_isPastel(item) && !_isBebida(item);
+      }).toList();
+    } else {
+      // CENÁRIO B: NÃO Tem Pastel
+      // Impressora Geral: Recebe TUDO (Bebidas, Lanches, etc)
+      // Impressora Pastel: Recebe Nada
+
+      itensParaImpressoraGeral = List.from(itens); // Cópia de tudo
+      itensParaImpressoraPastel = [];
+    }
 
     bool sucessoCaixa = false;
-    // Se não tiver pastéis, consideramos a "cozinha" como sucesso (nada a fazer)
-    bool sucessoCozinha = listaPasteis.isEmpty;
 
     // =========================================================================
-    // IMPRESSÃO 1: CAIXA (Cupom Completo + Produção Geral)
+    // IMPRESSÃO 1: CAIXA (Cupom Fiscal Completo + Comanda Geral)
     // =========================================================================
     try {
       print("Conectando ao CAIXA ($ipCaixa)...");
       final socketCaixa = await Socket.connect(ipCaixa, _printerPort,
           timeout: _connectionTimeout);
 
-      // A. Gera Cupom do Cliente (COM TODOS OS ITENS e DADOS DA EMPRESA)
+      // A. Gera Cupom do Cliente (SEMPRE COM A LISTA COMPLETA ORIGINAL)
       List<int> bytesCaixa = await _generateReceiptBytes(
           itens, orderNumber, totalValue, profile, dadosEmpresa);
 
-      // B. Gera Via da Cozinha Geral (Apenas itens que NÃO são pastel)
-      if (listaGeral.isNotEmpty) {
+      // B. Gera Via da Cozinha Geral (Se houver itens destinados a ela)
+      if (itensParaImpressoraGeral.isNotEmpty) {
         final bytesCozinhaGeral = await _generateKitchenBytes(
-            listaGeral, orderNumber, profile,
+            itensParaImpressoraGeral, orderNumber, profile,
             tituloSetor: "COZINHA (GERAL)");
 
-        // Concatena a via da cozinha ao final do cupom do cliente
         bytesCaixa.addAll(bytesCozinhaGeral);
       }
 
-      // Envia tudo para o Caixa de uma vez
       socketCaixa.add(Uint8List.fromList(bytesCaixa));
       await socketCaixa.flush();
       await socketCaixa.close();
@@ -95,23 +107,23 @@ class PrinterService {
     }
 
     // =========================================================================
-    // IMPRESSÃO 2: COZINHA/PASTELARIA (Apenas Pastéis)
+    // IMPRESSÃO 2: COZINHA/PASTELARIA (Pasteis + Bebidas, se houver pastel)
     // =========================================================================
-    // Só tenta imprimir se houver pastéis e se o IP estiver configurado
-    if (listaPasteis.isNotEmpty && ipCozinha != null && ipCozinha.isNotEmpty) {
+    if (itensParaImpressoraPastel.isNotEmpty &&
+        ipCozinha != null &&
+        ipCozinha.isNotEmpty) {
       try {
-        print("Conectando à COZINHA ($ipCozinha)...");
+        print("Conectando à COZINHA/PASTEL ($ipCozinha)...");
         final socketCozinha = await Socket.connect(ipCozinha, _printerPort,
             timeout: _connectionTimeout);
 
         final bytesPastelaria = await _generateKitchenBytes(
-            listaPasteis, orderNumber, profile,
-            tituloSetor: "COZINHA (PASTEL)");
+            itensParaImpressoraPastel, orderNumber, profile,
+            tituloSetor: "COZINHA (PASTEL/BEBIDA)");
 
         socketCozinha.add(Uint8List.fromList(bytesPastelaria));
         await socketCozinha.flush();
         await socketCozinha.close();
-        sucessoCozinha = true;
         print("Impressão COZINHA OK.");
       } catch (e) {
         print("ERRO Impressão COZINHA: $e");
@@ -121,34 +133,54 @@ class PrinterService {
     return sucessoCaixa;
   }
 
-  // --- VIA DO CLIENTE (DADOS DINÂMICOS DA EMPRESA) ---
+  // --- FUNÇÕES AUXILIARES DE FILTRO ---
+
+  static bool _isPastel(Itens item) {
+    final nome = (item.nome ?? '').toLowerCase();
+    return nome.contains('pastel');
+  }
+
+  static bool _isBebida(Itens item) {
+    final nome = (item.nome ?? '').toLowerCase();
+    // Adicione aqui palavras-chave que identificam bebidas no seu sistema
+    return nome.contains('bebida') ||
+        nome.contains('refrigerante') ||
+        nome.contains('suco') ||
+        nome.contains('agua') ||
+        nome.contains('água') ||
+        nome.contains('coca') ||
+        nome.contains('fanta') ||
+        nome.contains('guarana') ||
+        nome.contains('cerveja') ||
+        nome.contains('soda') ||
+        nome.contains('lata') ||
+        nome.contains('600ml') ||
+        nome.contains('2l');
+  }
+
+  // --- VIA DO CLIENTE ---
   static Future<List<int>> _generateReceiptBytes(
       List<Itens> itens,
       int orderNumber,
       double totalValue,
       CapabilityProfile profile,
       Empresa empresa) async {
-    // Recebe o objeto Empresa
-
-    print(empresa.titulo1?.toUpperCase());
-
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
 
     bytes += generator.reset();
 
-    // --- TÍTULO DINÂMICO ---
-    // titulo1: Nome Fantasia (Ex: "LANCHONETE DO ZÉ")
+    // Título
     bytes += generator.text(empresa.titulo1?.toUpperCase() ?? 'LANCHONETE',
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
             height: PosTextSize.size2,
-            width: PosTextSize.size2));
+            width: PosTextSize.size2,
+            codeTable: 'CP860'));
 
-    // titulo2: Endereço ou Razão Social
     bytes += generator.text(empresa.titulo2 ?? 'Endereco nao informado',
-        styles: const PosStyles(align: PosAlign.center));
+        styles: const PosStyles(align: PosAlign.center, codeTable: 'CP860'));
 
     bytes += generator.feed(1);
 
@@ -168,7 +200,7 @@ class PrinterService {
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.hr();
 
-    // Tabela
+    // Cabeçalho Tabela
     bytes += generator.row([
       PosColumn(text: 'Qtd', width: 2, styles: const PosStyles(bold: true)),
       PosColumn(text: 'Item', width: 6, styles: const PosStyles(bold: true)),
@@ -196,6 +228,13 @@ class PrinterService {
       }
       double totalLinha = (valorBase + valorAdicionais) * qtd;
 
+      // Limpeza de caracteres especiais para evitar bug na impressora
+      String valorFormatado = _formatMoeda
+          .format(totalLinha)
+          .replaceAll('R\$', '')
+          .replaceAll('\u00A0', '') // Remove espaço invisível
+          .trim();
+
       bytes += generator.row([
         PosColumn(
             text: '${qtd.toInt()}x',
@@ -204,9 +243,9 @@ class PrinterService {
         PosColumn(
             text: item.nome ?? 'Item',
             width: 6,
-            styles: const PosStyles(align: PosAlign.left)),
+            styles: const PosStyles(align: PosAlign.left, codeTable: 'CP860')),
         PosColumn(
-            text: _formatMoeda.format(totalLinha).replaceAll('R\$', '').trim(),
+            text: valorFormatado,
             width: 4,
             styles: const PosStyles(align: PosAlign.right)),
       ]);
@@ -215,21 +254,34 @@ class PrinterService {
         for (var c in item.complementos!) {
           bytes += generator.text("   + ${c.quantidade}x ${c.nome}",
               styles: const PosStyles(
-                  fontType: PosFontType.fontB, align: PosAlign.left));
+                  fontType: PosFontType.fontB,
+                  align: PosAlign.left,
+                  codeTable: 'CP860'));
         }
       }
       if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
         for (var op in item.opcoesNiveis!) {
           bytes += generator.text("   + ${op.quantidade}x ${op.nome}",
               styles: const PosStyles(
-                  fontType: PosFontType.fontB, align: PosAlign.left));
+                  fontType: PosFontType.fontB,
+                  align: PosAlign.left,
+                  codeTable: 'CP860'));
         }
       }
     }
 
     bytes += generator.hr();
 
-    // Total
+    // CORREÇÃO DO TOTAL FINAL
+    String totalNumerico = _formatMoeda
+        .format(totalValue)
+        .replaceAll('R\$', '')
+        .replaceAll('\u00A0', '')
+        .trim();
+
+    // Inserimos o R$ manualmente com espaço normal (ASCII 32)
+    String totalFinalParaImpressao = 'R\$ $totalNumerico';
+
     bytes += generator.row([
       PosColumn(
           text: 'TOTAL:',
@@ -237,7 +289,7 @@ class PrinterService {
           styles: const PosStyles(
               bold: true, height: PosTextSize.size2, width: PosTextSize.size2)),
       PosColumn(
-          text: _formatMoeda.format(totalValue),
+          text: totalFinalParaImpressao,
           width: 6,
           styles: const PosStyles(
               bold: true,
@@ -255,7 +307,7 @@ class PrinterService {
     return bytes;
   }
 
-  // --- VIA DA COZINHA (Layout Otimizado) ---
+  // --- VIA DA COZINHA ---
   static Future<List<int>> _generateKitchenBytes(
       List<Itens> itens, int orderNumber, CapabilityProfile profile,
       {String tituloSetor = "COZINHA"}) async {
@@ -264,14 +316,14 @@ class PrinterService {
 
     bytes += generator.reset();
 
-    // Cabeçalho Setorizado (Invertido para destaque)
     bytes += generator.text(tituloSetor,
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
             height: PosTextSize.size2,
             width: PosTextSize.size2,
-            reverse: true));
+            reverse: true,
+            codeTable: 'CP860'));
     bytes += generator.feed(1);
 
     bytes += generator.text('PEDIDO: ${orderNumber.toString().padLeft(3, '0')}',
@@ -289,10 +341,12 @@ class PrinterService {
     for (var item in itens) {
       double qtd = item.quantidade ?? 1;
 
-      // Layout Linear: Quantidade e Nome em destaque
       bytes += generator.text('${qtd.toInt()}x ${item.nome?.toUpperCase()}',
           styles: const PosStyles(
-              height: PosTextSize.size2, width: PosTextSize.size1, bold: true));
+              height: PosTextSize.size2,
+              width: PosTextSize.size1,
+              bold: true,
+              codeTable: 'CP860'));
 
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var c in item.complementos!) {
@@ -300,7 +354,8 @@ class PrinterService {
               styles: const PosStyles(
                   height: PosTextSize.size1,
                   width: PosTextSize.size1,
-                  bold: true));
+                  bold: true,
+                  codeTable: 'CP860'));
         }
       }
 
@@ -310,14 +365,16 @@ class PrinterService {
               styles: const PosStyles(
                   height: PosTextSize.size1,
                   width: PosTextSize.size1,
-                  bold: true));
+                  bold: true,
+                  codeTable: 'CP860'));
         }
       }
 
       if (item.obs != null && item.obs!.isNotEmpty) {
         bytes += generator.feed(1);
         bytes += generator.text("  OBS: ${item.obs}",
-            styles: const PosStyles(bold: true, reverse: true));
+            styles:
+                const PosStyles(bold: true, reverse: true, codeTable: 'CP860'));
       }
 
       bytes += generator.hr(ch: '-');
