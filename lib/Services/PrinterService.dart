@@ -1,6 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart'; // Usado apenas para Data/Hora agora
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/empresa_model.dart';
@@ -11,20 +12,37 @@ class PrinterService {
   static const int _printerPort = 9100;
   static const Duration _connectionTimeout = Duration(seconds: 4);
 
-  static final _formatMoeda =
-      NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+  // --- FORMATAÇÃO MANUAL (RESOLVE O BUG DO 'á' E R$ DUPLO) ---
+  static String _formatarMoedaManual(double valor) {
+    // Transforma 20.0 em "20.00"
+    String temp = valor.toStringAsFixed(2);
+    // Troca ponto por virgula: "20,00"
+    temp = temp.replaceAll('.', ',');
+    // Adiciona o R$ manualmente com espaço normal (ASCII 32)
+    return "R\$ $temp";
+  }
 
-  /// Tenta imprimir Cupom + Comandas Separadas
+  // --- REMOVE ACENTOS (RESOLVE O BUG DO 'ç' VIRAR '|') ---
+  static String _semAcentos(String str) {
+    if (str.isEmpty) return "";
+    var comAcento =
+        'ÀÁÂÃÄÅàáâãäåÒÓÔÕÕÖØòóôõöøÈÉÊËèéêëðÇçÐÌÍÎÏìíîïÙÚÛÜùúûüÑñŠšŸÿýŽž';
+    var semAcento =
+        'AAAAAAaaaaaaOOOOOOOooooooEEEEeeeeeCcDIIIIiiiiUUUUuuuuNnSsYyyZz';
+
+    for (int i = 0; i < comAcento.length; i++) {
+      str = str.replaceAll(comAcento[i], semAcento[i]);
+    }
+    return str;
+  }
+
   static Future<bool> printOrder(
       {required List<Itens> itens,
       required int orderNumber,
-      required double totalValue}) async {
-    if (kIsWeb) {
-      print("Impressão direta não suportada na Web.");
-      return false;
-    }
+      required double totalValue,
+      bool isParaLevar = false}) async {
+    if (kIsWeb) return false;
 
-    // 1. Carregar Configurações de IP
     final prefs = await SharedPreferences.getInstance();
     final ipCaixa = prefs.getString('printer_ip_caixa');
     final ipCozinha = prefs.getString('printer_ip_cozinha');
@@ -34,131 +52,85 @@ class PrinterService {
       return false;
     }
 
-    // 2. BUSCAR DADOS DA EMPRESA
     Empresa dadosEmpresa = await EmpresaService.fetchDadosEmpresa();
 
-    // 3. Carregar Perfil da Impressora
-    CapabilityProfile profile;
-    try {
-      profile = await CapabilityProfile.load(name: 'XP-N160II');
-    } catch (e) {
-      profile = await CapabilityProfile.load();
-    }
+    // Carrega perfil padrão para garantir máxima compatibilidade
+    CapabilityProfile profile = await CapabilityProfile.load();
 
-    // 4. LÓGICA DE SEPARAÇÃO (Pastel + Bebidas)
-
-    // Verifica se existe ALGUM pastel no pedido
+    // --- SEPARAÇÃO ---
     bool temPastel = itens.any((item) => _isPastel(item));
-
-    List<Itens> itensParaImpressoraGeral = [];
-    List<Itens> itensParaImpressoraPastel = [];
+    List<Itens> itensGeral = [];
+    List<Itens> itensPastel = [];
 
     if (temPastel) {
-      // CENÁRIO A: Tem Pastel
-      // Impressora Pastel: Recebe Pasteis + Bebidas
-      // Impressora Geral: Recebe o Resto (Lanches, Porções, etc)
-
-      itensParaImpressoraPastel = itens.where((item) {
-        return _isPastel(item) || _isBebida(item);
-      }).toList();
-
-      itensParaImpressoraGeral = itens.where((item) {
-        return !_isPastel(item) && !_isBebida(item);
-      }).toList();
+      itensPastel =
+          itens.where((item) => _isPastel(item) || _isBebida(item)).toList();
+      itensGeral =
+          itens.where((item) => !_isPastel(item) && !_isBebida(item)).toList();
     } else {
-      // CENÁRIO B: NÃO Tem Pastel
-      // Impressora Geral: Recebe TUDO (Bebidas, Lanches, etc)
-      // Impressora Pastel: Recebe Nada
-
-      itensParaImpressoraGeral = List.from(itens); // Cópia de tudo
-      itensParaImpressoraPastel = [];
+      itensGeral = List.from(itens);
     }
 
-    bool sucessoCaixa = false;
+    bool sucesso = false;
 
-    // =========================================================================
-    // IMPRESSÃO 1: CAIXA (Cupom Fiscal Completo + Comanda Geral)
-    // =========================================================================
+    // 1. IMPRESSORA CAIXA
     try {
-      print("Conectando ao CAIXA ($ipCaixa)...");
       final socketCaixa = await Socket.connect(ipCaixa, _printerPort,
           timeout: _connectionTimeout);
 
-      // A. Gera Cupom do Cliente (SEMPRE COM A LISTA COMPLETA ORIGINAL)
-      List<int> bytesCaixa = await _generateReceiptBytes(
+      List<int> bytes = await _generateReceiptBytes(
           itens, orderNumber, totalValue, profile, dadosEmpresa);
 
-      // B. Gera Via da Cozinha Geral (Se houver itens destinados a ela)
-      if (itensParaImpressoraGeral.isNotEmpty) {
-        final bytesCozinhaGeral = await _generateKitchenBytes(
-            itensParaImpressoraGeral, orderNumber, profile,
-            tituloSetor: "COZINHA (GERAL)");
-
-        bytesCaixa.addAll(bytesCozinhaGeral);
+      if (itensGeral.isNotEmpty) {
+        bytes.addAll(await _generateKitchenBytes(
+            itensGeral, orderNumber, profile,
+            tituloSetor: "COZINHA (GERAL)", isParaLevar: isParaLevar));
       }
 
-      socketCaixa.add(Uint8List.fromList(bytesCaixa));
+      socketCaixa.add(Uint8List.fromList(bytes));
       await socketCaixa.flush();
       await socketCaixa.close();
-      sucessoCaixa = true;
-      print("Impressão CAIXA OK.");
+      sucesso = true;
     } catch (e) {
-      print("ERRO Impressão CAIXA: $e");
+      print("Erro Caixa: $e");
     }
 
-    // =========================================================================
-    // IMPRESSÃO 2: COZINHA/PASTELARIA (Pasteis + Bebidas, se houver pastel)
-    // =========================================================================
-    if (itensParaImpressoraPastel.isNotEmpty &&
-        ipCozinha != null &&
-        ipCozinha.isNotEmpty) {
+    // 2. IMPRESSORA COZINHA
+    if (itensPastel.isNotEmpty && ipCozinha != null && ipCozinha.isNotEmpty) {
       try {
-        print("Conectando à COZINHA/PASTEL ($ipCozinha)...");
         final socketCozinha = await Socket.connect(ipCozinha, _printerPort,
             timeout: _connectionTimeout);
 
-        final bytesPastelaria = await _generateKitchenBytes(
-            itensParaImpressoraPastel, orderNumber, profile,
-            tituloSetor: "COZINHA (PASTEL/BEBIDA)");
+        List<int> bytes = await _generateKitchenBytes(
+            itensPastel, orderNumber, profile,
+            tituloSetor: "COZINHA (PASTEL)", isParaLevar: isParaLevar);
 
-        socketCozinha.add(Uint8List.fromList(bytesPastelaria));
+        socketCozinha.add(Uint8List.fromList(bytes));
         await socketCozinha.flush();
         await socketCozinha.close();
-        print("Impressão COZINHA OK.");
       } catch (e) {
-        print("ERRO Impressão COZINHA: $e");
+        print("Erro Cozinha: $e");
       }
     }
 
-    return sucessoCaixa;
+    return sucesso;
   }
 
-  // --- FUNÇÕES AUXILIARES DE FILTRO ---
-
-  static bool _isPastel(Itens item) {
-    final nome = (item.nome ?? '').toLowerCase();
-    return nome.contains('pastel');
-  }
+  static bool _isPastel(Itens item) =>
+      (item.nome ?? '').toLowerCase().contains('pastel');
 
   static bool _isBebida(Itens item) {
-    final nome = (item.nome ?? '').toLowerCase();
-    // Adicione aqui palavras-chave que identificam bebidas no seu sistema
+    String nome = (item.nome ?? '').toLowerCase();
     return nome.contains('bebida') ||
-        nome.contains('refrigerante') ||
+        nome.contains('refri') ||
         nome.contains('suco') ||
         nome.contains('agua') ||
-        nome.contains('água') ||
-        nome.contains('coca') ||
-        nome.contains('fanta') ||
-        nome.contains('guarana') ||
         nome.contains('cerveja') ||
-        nome.contains('soda') ||
-        nome.contains('lata') ||
-        nome.contains('600ml') ||
-        nome.contains('2l');
+        nome.contains('coca') ||
+        nome.contains('lata');
   }
 
-  // --- VIA DO CLIENTE ---
+  // --- GERADOR CUPOM CLIENTE ---
   static Future<List<int>> _generateReceiptBytes(
       List<Itens> itens,
       int orderNumber,
@@ -167,26 +139,23 @@ class PrinterService {
       Empresa empresa) async {
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
-
     bytes += generator.reset();
 
-    // Título
-    bytes += generator.text(empresa.titulo1?.toUpperCase() ?? 'LANCHONETE',
+    // Cabeçalho - Sanitizado
+    bytes += generator.text(
+        _semAcentos(empresa.titulo1?.toUpperCase() ?? 'LANCHONETE'),
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
             height: PosTextSize.size2,
-            width: PosTextSize.size2,
-            codeTable: 'CP860'));
+            width: PosTextSize.size2));
 
-    bytes += generator.text(empresa.titulo2 ?? 'Endereco nao informado',
-        styles: const PosStyles(align: PosAlign.center, codeTable: 'CP860'));
+    bytes += generator.text(_semAcentos(empresa.titulo2 ?? ''),
+        styles: const PosStyles(align: PosAlign.center));
 
     bytes += generator.feed(1);
-
-    // Senha
     bytes += generator.text('SENHA / PEDIDO',
-        styles: const PosStyles(align: PosAlign.center, bold: true));
+        styles: const PosStyles(align: PosAlign.center));
     bytes += generator.text(orderNumber.toString().padLeft(3, '0'),
         styles: const PosStyles(
             align: PosAlign.center,
@@ -200,7 +169,7 @@ class PrinterService {
         styles: const PosStyles(align: PosAlign.center));
     bytes += generator.hr();
 
-    // Cabeçalho Tabela
+    // Tabela Itens
     bytes += generator.row([
       PosColumn(text: 'Qtd', width: 2, styles: const PosStyles(bold: true)),
       PosColumn(text: 'Item', width: 6, styles: const PosStyles(bold: true)),
@@ -213,75 +182,54 @@ class PrinterService {
 
     for (var item in itens) {
       double qtd = item.quantidade ?? 1;
-      double valorBase = item.valor ?? 0;
-      double valorAdicionais = 0;
-
+      double valorTotalItem = (item.valor ?? 0);
       if (item.complementos != null) {
-        for (var c in item.complementos!) {
-          valorAdicionais += (c.valor * c.quantidade);
-        }
+        for (var c in item.complementos!)
+          valorTotalItem += (c.valor * c.quantidade);
       }
       if (item.opcoesNiveis != null) {
-        for (var op in item.opcoesNiveis!) {
-          valorAdicionais += (op.valorAdicional * op.quantidade);
-        }
+        for (var op in item.opcoesNiveis!)
+          valorTotalItem += (op.valorAdicional * op.quantidade);
       }
-      double totalLinha = (valorBase + valorAdicionais) * qtd;
+      double totalLinha = valorTotalItem * qtd;
 
-      // Limpeza de caracteres especiais para evitar bug na impressora
-      String valorFormatado = _formatMoeda
-          .format(totalLinha)
-          .replaceAll('R\$', '')
-          .replaceAll('\u00A0', '') // Remove espaço invisível
-          .trim();
+      // Nome do item sanitizado
+      String nomeItem = _semAcentos(item.nome ?? '');
 
       bytes += generator.row([
         PosColumn(
             text: '${qtd.toInt()}x',
             width: 2,
-            styles: const PosStyles(bold: true, align: PosAlign.left)),
+            styles: const PosStyles(align: PosAlign.left, bold: true)),
         PosColumn(
-            text: item.nome ?? 'Item',
+            text: nomeItem,
             width: 6,
-            styles: const PosStyles(align: PosAlign.left, codeTable: 'CP860')),
+            styles: const PosStyles(align: PosAlign.left)),
         PosColumn(
-            text: valorFormatado,
+            text: _formatarMoedaManual(totalLinha).replaceAll(
+                'R\$ ', ''), // Remove R$ na linha do item para caber melhor
             width: 4,
             styles: const PosStyles(align: PosAlign.right)),
       ]);
 
-      if (item.complementos != null && item.complementos!.isNotEmpty) {
+      if (item.complementos != null) {
         for (var c in item.complementos!) {
-          bytes += generator.text("   + ${c.quantidade}x ${c.nome}",
-              styles: const PosStyles(
-                  fontType: PosFontType.fontB,
-                  align: PosAlign.left,
-                  codeTable: 'CP860'));
+          bytes += generator.text(" + ${c.quantidade}x ${_semAcentos(c.nome!)}",
+              styles: const PosStyles(fontType: PosFontType.fontB));
         }
       }
-      if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
+      if (item.opcoesNiveis != null) {
         for (var op in item.opcoesNiveis!) {
-          bytes += generator.text("   + ${op.quantidade}x ${op.nome}",
-              styles: const PosStyles(
-                  fontType: PosFontType.fontB,
-                  align: PosAlign.left,
-                  codeTable: 'CP860'));
+          bytes += generator.text(
+              " + ${op.quantidade}x ${_semAcentos(op.nome)}",
+              styles: const PosStyles(fontType: PosFontType.fontB));
         }
       }
     }
 
     bytes += generator.hr();
 
-    // CORREÇÃO DO TOTAL FINAL
-    String totalNumerico = _formatMoeda
-        .format(totalValue)
-        .replaceAll('R\$', '')
-        .replaceAll('\u00A0', '')
-        .trim();
-
-    // Inserimos o R$ manualmente com espaço normal (ASCII 32)
-    String totalFinalParaImpressao = 'R\$ $totalNumerico';
-
+    // Total Final - Usando formatação manual
     bytes += generator.row([
       PosColumn(
           text: 'TOTAL:',
@@ -289,7 +237,7 @@ class PrinterService {
           styles: const PosStyles(
               bold: true, height: PosTextSize.size2, width: PosTextSize.size2)),
       PosColumn(
-          text: totalFinalParaImpressao,
+          text: _formatarMoedaManual(totalValue), // AQUI: Usa a função manual
           width: 6,
           styles: const PosStyles(
               bold: true,
@@ -307,25 +255,38 @@ class PrinterService {
     return bytes;
   }
 
-  // --- VIA DA COZINHA ---
+  // --- VIA COZINHA ---
   static Future<List<int>> _generateKitchenBytes(
       List<Itens> itens, int orderNumber, CapabilityProfile profile,
-      {String tituloSetor = "COZINHA"}) async {
+      {String tituloSetor = "COZINHA", bool isParaLevar = false}) async {
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
-
     bytes += generator.reset();
 
-    bytes += generator.text(tituloSetor,
+    if (isParaLevar) {
+      bytes += generator.text('*** VIAGEM / PARA LEVAR ***',
+          styles: const PosStyles(
+              align: PosAlign.center,
+              bold: true,
+              height: PosTextSize.size2,
+              width: PosTextSize.size2,
+              reverse: true));
+      bytes += generator.feed(1);
+    } else {
+      bytes += generator.text('CONSUMO NO LOCAL (MESA)',
+          styles: const PosStyles(align: PosAlign.center, bold: true));
+      bytes += generator.feed(1);
+    }
+
+    bytes += generator.text(_semAcentos(tituloSetor),
         styles: const PosStyles(
             align: PosAlign.center,
             bold: true,
             height: PosTextSize.size2,
             width: PosTextSize.size2,
-            reverse: true,
-            codeTable: 'CP860'));
-    bytes += generator.feed(1);
+            reverse: true));
 
+    bytes += generator.feed(1);
     bytes += generator.text('PEDIDO: ${orderNumber.toString().padLeft(3, '0')}',
         styles: const PosStyles(
             align: PosAlign.center,
@@ -334,49 +295,36 @@ class PrinterService {
             bold: true));
 
     bytes += generator.text(DateFormat('HH:mm').format(DateTime.now()),
-        styles: const PosStyles(align: PosAlign.center, bold: true));
+        styles: const PosStyles(align: PosAlign.center));
     bytes += generator.hr(ch: '=');
-    bytes += generator.feed(1);
 
     for (var item in itens) {
       double qtd = item.quantidade ?? 1;
+      // Sanitiza nome do item
+      String nomeItem = _semAcentos(item.nome?.toUpperCase() ?? "");
 
-      bytes += generator.text('${qtd.toInt()}x ${item.nome?.toUpperCase()}',
+      bytes += generator.text('${qtd.toInt()}x $nomeItem',
           styles: const PosStyles(
-              height: PosTextSize.size2,
-              width: PosTextSize.size1,
-              bold: true,
-              codeTable: 'CP860'));
+              height: PosTextSize.size2, width: PosTextSize.size1, bold: true));
 
-      if (item.complementos != null && item.complementos!.isNotEmpty) {
+      if (item.complementos != null) {
         for (var c in item.complementos!) {
-          bytes += generator.text("  [+] ${c.quantidade}x ${c.nome}",
-              styles: const PosStyles(
-                  height: PosTextSize.size1,
-                  width: PosTextSize.size1,
-                  bold: true,
-                  codeTable: 'CP860'));
+          bytes += generator.text(
+              "  [+] ${c.quantidade}x ${_semAcentos(c.nome!)}",
+              styles: const PosStyles(bold: true));
         }
       }
-
-      if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
+      if (item.opcoesNiveis != null) {
         for (var op in item.opcoesNiveis!) {
-          bytes += generator.text("  [+] ${op.quantidade}x ${op.nome}",
-              styles: const PosStyles(
-                  height: PosTextSize.size1,
-                  width: PosTextSize.size1,
-                  bold: true,
-                  codeTable: 'CP860'));
+          bytes += generator.text(
+              "  [+] ${op.quantidade}x ${_semAcentos(op.nome)}",
+              styles: const PosStyles(bold: true));
         }
       }
-
       if (item.obs != null && item.obs!.isNotEmpty) {
-        bytes += generator.feed(1);
-        bytes += generator.text("  OBS: ${item.obs}",
-            styles:
-                const PosStyles(bold: true, reverse: true, codeTable: 'CP860'));
+        bytes += generator.text("  OBS: ${_semAcentos(item.obs!)}",
+            styles: const PosStyles(bold: true, reverse: true));
       }
-
       bytes += generator.hr(ch: '-');
     }
 

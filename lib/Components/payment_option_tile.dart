@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Widget para exibir uma opção de pagamento
+/// Widget para exibir uma opção de pagamento (Versão Compacta)
 class PaymentOptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -20,7 +20,7 @@ class PaymentOptionTile extends StatelessWidget {
   _listaOptions(bool isHorizontal) {
     return [
       Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12), // Reduzido de 16 para 12
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
@@ -28,41 +28,40 @@ class PaymentOptionTile extends StatelessWidget {
         child: Icon(
           icon,
           color: color,
-          size: 32,
+          size: 26, // Reduzido de 32 para 26
         ),
       ),
-      isHorizontal ? SizedBox(height: 12) : SizedBox(width: 12),
+      isHorizontal ? const SizedBox(height: 8) : const SizedBox(width: 12),
       Text(
         title,
-        style: TextStyle(
-          fontSize: 16,
+        style: const TextStyle(
+          fontSize: 14, // Reduzido de 16 para 14
           fontWeight: FontWeight.bold,
           color: Colors.black87,
         ),
         textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-      isHorizontal ? SizedBox(height: 4) : SizedBox(width: 4),
+      isHorizontal ? const SizedBox(height: 2) : const SizedBox(width: 4),
       Text(
         subtitle,
-        style: TextStyle(
-          fontSize: 12,
+        style: const TextStyle(
+          fontSize: 11, // Reduzido de 12 para 11
           color: Colors.black54,
         ),
         textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
-      SizedBox(height: 8),
-      Icon(
-        Icons.arrow_forward_ios,
-        color: Colors.black38,
-        size: 18,
-      ),
+      // Removi o ícone de seta para economizar espaço e poluição visual
     ];
   }
 
   _buildOptions(bool isHorizontal) {
     if (isHorizontal) {
       return Column(
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: _listaOptions(isHorizontal),
       );
@@ -78,18 +77,19 @@ class PaymentOptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final orientation = MediaQuery.of(context).orientation;
     final isHorizontal = orientation == Orientation.landscape;
+
     return Card(
-      elevation: 2,
+      elevation: 1, // Sombra mais leve
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: InkWell(
         onTap: onPressed,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(8), // Padding externo menor
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: color.withOpacity(0.3),
               width: 1,
