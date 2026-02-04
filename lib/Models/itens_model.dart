@@ -11,6 +11,7 @@ class Itens {
   String? obs;
   String? nome;
   int? grade;
+  int? codGrupo;
   List<Complementos>? complementos;
   List<OpcaoNivel>? opcoesNiveis;
   int? id;
@@ -30,6 +31,7 @@ class Itens {
       this.opcoesNiveis,
       this.codigo,
       this.grade,
+      this.codGrupo,
       this.gradeProduto,
       this.usuario,
       this.idAgrupamento}) {
@@ -74,6 +76,7 @@ class Itens {
       "quantidade": quantidade,
       "obs": obs,
       "grade": grade,
+      "codGrupo": codGrupo,
       "nome": nome,
       "gradeProduto": gradeProduto != null ? gradeProduto!.toJson() : null,
       "complementos": complementos != null

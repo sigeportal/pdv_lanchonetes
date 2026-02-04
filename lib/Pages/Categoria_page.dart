@@ -379,6 +379,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                 builder: (context) => SelecaoOpcoesProdutoWidget(
                   item: item,
                   niveis: niveis,
+                  grupo: item.codGrupo,
                 ),
               );
             }

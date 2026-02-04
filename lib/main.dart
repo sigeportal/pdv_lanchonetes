@@ -3,7 +3,6 @@ import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:lanchonete/Controller/Theme.Controller.dart';
 import 'package:lanchonete/Controller/usuario_controller.dart';
-import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:lanchonete/Pages/Principal_page.dart';

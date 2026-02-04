@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
+import 'package:lanchonete/Controller/complementos_controller.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/niveis_model.dart';
+import 'package:lanchonete/Models/complementos_model.dart';
 
 class SelecaoOpcoesProdutoWidget extends StatefulWidget {
   final Itens item;
   final List<Nivel>? niveis;
+  final int? grupo; // Grupo do produto para buscar complementos
 
   const SelecaoOpcoesProdutoWidget({
     Key? key,
     required this.item,
     this.niveis,
+    this.grupo,
   }) : super(key: key);
 
   @override
@@ -25,6 +29,7 @@ class _SelecaoOpcoesProdutoWidgetState
   final _formatMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   late List<Nivel> _niveis;
+  late List<Complementos> _complementos;
   final ScrollController _scrollController = ScrollController();
   final List<GlobalKey> _keys = [];
 
@@ -32,6 +37,7 @@ class _SelecaoOpcoesProdutoWidgetState
   void initState() {
     super.initState();
     _inicializarNiveis();
+    _inicializarComplementos();
   }
 
   @override
@@ -83,6 +89,34 @@ class _SelecaoOpcoesProdutoWidgetState
     }
   }
 
+  void _inicializarComplementos() {
+    _complementos = [];
+
+    // Se houver grupo definido, buscar complementos
+    if (widget.grupo != null && widget.grupo! > 0) {
+      ComplementosController()
+          .buscaComplementos(grupo: widget.grupo)
+          .then((complementos) {
+        // Restaura seleções anteriores se existirem
+        if (widget.item.complementos != null) {
+          for (var salvo in widget.item.complementos!) {
+            var indice =
+                complementos.indexWhere((c) => c.codigo == salvo.codigo);
+            if (indice != -1) {
+              complementos[indice].quantidade = salvo.quantidade ?? 0;
+              complementos[indice].selecionado = true;
+            }
+          }
+        }
+        setState(() {
+          _complementos = complementos;
+        });
+      }).catchError((e) {
+        print('Erro ao buscar complementos: $e');
+      });
+    }
+  }
+
   void _restaurarSelecoes() {
     for (var salvo in widget.item.opcoesNiveis!) {
       for (var nivel in _niveis) {
@@ -96,7 +130,7 @@ class _SelecaoOpcoesProdutoWidgetState
             opcao.selecionado = true;
           } else {
             // Múltipla escolha
-            opcao.quantidade = salvo.quantidade ?? 1;
+            opcao.quantidade = salvo.quantidade;
           }
         }
       }
@@ -139,6 +173,7 @@ class _SelecaoOpcoesProdutoWidgetState
 
   double _calcularTotalAdicionais() {
     double total = 0;
+    // Total de níveis
     for (var nivel in _niveis) {
       for (var op in nivel.opcoes) {
         if (nivel.selecaoMax == 1 && op.selecionado) {
@@ -148,12 +183,19 @@ class _SelecaoOpcoesProdutoWidgetState
         }
       }
     }
+    // Total de complementos
+    for (var comp in _complementos) {
+      if (comp.quantidade != null && comp.quantidade! > 0) {
+        total += (comp.valor * comp.quantidade!);
+      }
+    }
     return total;
   }
 
   void _salvar() {
     List<OpcaoNivel> listaFinal = [];
 
+    // Adicionar níveis
     for (var nivel in _niveis) {
       if (nivel.selecaoMax == 1) {
         // Escolha única
@@ -193,6 +235,20 @@ class _SelecaoOpcoesProdutoWidgetState
             ));
           }
         }
+      }
+    }
+
+    // Adicionar complementos selecionados
+    if (_complementos.isNotEmpty) {
+      List<Complementos> complementosSelecionados = [];
+      for (var comp in _complementos) {
+        if (comp.quantidade != null && comp.quantidade! > 0) {
+          complementosSelecionados.add(comp);
+        }
+      }
+      if (complementosSelecionados.isNotEmpty) {
+        Provider.of<ComandaController>(context, listen: false)
+            .adicionaComplementos(widget.item.codigo, complementosSelecionados);
       }
     }
 
@@ -251,14 +307,21 @@ class _SelecaoOpcoesProdutoWidgetState
               ),
             ),
 
-            // LISTA DE NIVEIS
+            // LISTA DE NIVEIS E COMPLEMENTOS
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 20),
-                itemCount: _niveis.length,
+                itemCount: _niveis.length + (_complementos.isNotEmpty ? 1 : 0),
                 itemBuilder: (context, index) {
-                  return _buildNivelContainer(index);
+                  // Se estamos nos níveis
+                  if (index < _niveis.length) {
+                    return _buildNivelContainer(index);
+                  }
+                  // Se chegou ao final, mostrar complementos
+                  else {
+                    return _buildComplementosContainer();
+                  }
                 },
               ),
             ),
@@ -504,5 +567,113 @@ class _SelecaoOpcoesProdutoWidgetState
         child: Icon(icon, size: 18, color: iconColor),
       ),
     );
+  }
+
+  Widget _buildComplementosContainer() {
+    if (_complementos.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cabeçalho de Complementos
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            color: Colors.grey[100],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "COMPLEMENTOS",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700],
+                      fontSize: 13,
+                      letterSpacing: 0.5),
+                ),
+              ],
+            ),
+          ),
+          // Lista de Complementos
+          ..._complementos.map((complemento) {
+            bool ativo =
+                complemento.quantidade != null && complemento.quantidade! > 0;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey[100]!))),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(complemento.nome ?? "",
+                            style: TextStyle(
+                                fontSize: 16,
+                                color:
+                                    ativo ? Colors.black87 : Colors.grey[700],
+                                fontWeight: ativo
+                                    ? FontWeight.w500
+                                    : FontWeight.normal)),
+                        if (complemento.valor != null && complemento.valor > 0)
+                          Text("+ ${_formatMoeda.format(complemento.valor)}",
+                              style: TextStyle(
+                                  color: Colors.green[700],
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13))
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      if (ativo) ...[
+                        _btnAcao(
+                            icon: Icons.remove,
+                            color: Colors.white,
+                            borderColor: Colors.grey[300]!,
+                            iconColor: Colors.grey[600]!,
+                            onTap: () => _atualizarQuantidadeComplemento(
+                                complemento, -1)),
+                        Container(
+                          width: 35,
+                          alignment: Alignment.center,
+                          child: Text("${complemento.quantidade}",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ],
+                      _btnAcao(
+                          icon: Icons.add,
+                          color: ativo ? Colors.white : Colors.white,
+                          borderColor:
+                              ativo ? Colors.amber[600]! : Colors.grey[300]!,
+                          iconColor:
+                              ativo ? Colors.amber[700]! : Colors.grey[600]!,
+                          onTap: () =>
+                              _atualizarQuantidadeComplemento(complemento, 1)),
+                    ],
+                  )
+                ],
+              ),
+            );
+          }).toList(),
+        ],
+      ),
+    );
+  }
+
+  void _atualizarQuantidadeComplemento(Complementos complemento, int delta) {
+    setState(() {
+      int novaQtd = (complemento.quantidade ?? 0) + delta;
+      if (novaQtd >= 0) {
+        complemento.quantidade = novaQtd;
+        complemento.selecionado = novaQtd > 0;
+      }
+    });
   }
 }

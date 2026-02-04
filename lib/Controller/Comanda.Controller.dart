@@ -75,6 +75,7 @@ class ComandaController extends ChangeNotifier {
           valor: produto.valor,
           nome: produto.nome,
           grade: produto.grade,
+          codGrupo: produto.grupo,
           gradeProduto: gradeProduto,
           usuario: usuario,
           idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
