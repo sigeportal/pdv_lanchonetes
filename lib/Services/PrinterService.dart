@@ -310,15 +310,25 @@ class PrinterService {
       if (item.complementos != null) {
         for (var c in item.complementos!) {
           bytes += generator.text(
-              "  [+] ${c.quantidade}x ${_semAcentos(c.nome!)}",
-              styles: const PosStyles(bold: true));
+            "  [+] ${c.quantidade}x ${_semAcentos(c.nome!)}",
+            styles: const PosStyles(
+              height: PosTextSize.size2,
+              width: PosTextSize.size1,
+              bold: true,
+            ),
+          );
         }
       }
       if (item.opcoesNiveis != null) {
         for (var op in item.opcoesNiveis!) {
           bytes += generator.text(
-              "  [+] ${op.quantidade}x ${_semAcentos(op.nome)}",
-              styles: const PosStyles(bold: true));
+            "  [+] ${op.quantidade}x ${_semAcentos(op.nome)}",
+            styles: const PosStyles(
+              height: PosTextSize.size2,
+              width: PosTextSize.size1,
+              bold: true,
+            ),
+          );
         }
       }
       if (item.obs != null && item.obs!.isNotEmpty) {

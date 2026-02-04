@@ -1,5 +1,4 @@
 import 'package:lanchonete/Components/payment_option_tile.dart';
-import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -8,7 +7,6 @@ import 'package:lanchonete/Models/venda_model.dart';
 import 'package:lanchonete/Models/cliente_model.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
 import 'package:lanchonete/Pages/ReimpressaoCupom_page.dart';
-import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -29,7 +27,7 @@ class PaymentModePage extends StatefulWidget {
 }
 
 class _PaymentModePageState extends State<PaymentModePage> {
-  final TefController _tefController = Get.find();
+  //final TefController _tefController = Get.find();
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
@@ -447,42 +445,47 @@ class _PaymentModePageState extends State<PaymentModePage> {
 
     return showDialog<double>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(titulo),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: "Valor",
-            prefixText: "R\$ ",
-            border: OutlineInputBorder(),
+      builder: (context) {
+        // Função para validar e confirmar o valor
+        void _confirmarValor() {
+          String text =
+              controller.text.replaceAll('.', '').replaceAll(',', '.');
+          double? val = double.tryParse(text);
+          if (val != null) {
+            if (val > _valorRestante + 0.05) {
+              Fluttertoast.showToast(
+                  msg: "Valor não pode ser maior que o restante!");
+              return;
+            }
+            Navigator.pop(context, val);
+          }
+        }
+
+        return AlertDialog(
+          title: Text(titulo),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: "Valor",
+              prefixText: "R\$ ",
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _confirmarValor(),
           ),
-          onSubmitted: (_) => Navigator.of(context).pop(),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child:
-                  const Text("Cancelar", style: TextStyle(color: Colors.red))),
-          ElevatedButton(
-            onPressed: () {
-              String text =
-                  controller.text.replaceAll('.', '').replaceAll(',', '.');
-              double? val = double.tryParse(text);
-              if (val != null) {
-                if (val > _valorRestante + 0.05) {
-                  Fluttertoast.showToast(
-                      msg: "Valor não pode ser maior que o restante!");
-                  return;
-                }
-                Navigator.pop(context, val);
-              }
-            },
-            child: const Text("Confirmar"),
-          )
-        ],
-      ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar",
+                    style: TextStyle(color: Colors.red))),
+            ElevatedButton(
+              onPressed: _confirmarValor,
+              child: const Text("Confirmar"),
+            )
+          ],
+        );
+      },
     );
   }
 
