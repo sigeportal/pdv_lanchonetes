@@ -264,7 +264,7 @@ class PrinterService {
     bytes += generator.reset();
 
     if (isParaLevar) {
-      bytes += generator.text('*** VIAGEM / PARA LEVAR ***',
+      bytes += generator.text('* VIAGEM / PARA LEVAR *',
           styles: const PosStyles(
               align: PosAlign.center,
               bold: true,
@@ -274,7 +274,12 @@ class PrinterService {
       bytes += generator.feed(1);
     } else {
       bytes += generator.text('CONSUMO NO LOCAL (MESA)',
-          styles: const PosStyles(align: PosAlign.center, bold: true));
+          styles: const PosStyles(
+              align: PosAlign.center,
+              bold: true,
+              height: PosTextSize.size2,
+              width: PosTextSize.size2,
+              reverse: true));
       bytes += generator.feed(1);
     }
 
@@ -303,9 +308,14 @@ class PrinterService {
       // Sanitiza nome do item
       String nomeItem = _semAcentos(item.nome?.toUpperCase() ?? "");
 
-      bytes += generator.text('${qtd.toInt()}x $nomeItem',
-          styles: const PosStyles(
-              height: PosTextSize.size2, width: PosTextSize.size1, bold: true));
+      bytes += generator.text(
+        '${qtd.toInt()}x $nomeItem',
+        styles: const PosStyles(
+          height: PosTextSize.size2,
+          width: PosTextSize.size1,
+          bold: true,
+        ),
+      );
 
       if (item.complementos != null) {
         for (var c in item.complementos!) {
