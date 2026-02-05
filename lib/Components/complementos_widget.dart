@@ -10,7 +10,7 @@ import 'package:lanchonete/Models/complementos_model.dart';
 class SelecaoOpcoesProdutoWidget extends StatefulWidget {
   final Itens item;
   final List<Nivel>? niveis;
-  final int? grupo; // Grupo do produto para buscar complementos
+  final int? grupo;
 
   const SelecaoOpcoesProdutoWidget({
     Key? key,
@@ -47,10 +47,8 @@ class _SelecaoOpcoesProdutoWidgetState
   }
 
   void _inicializarNiveis() {
-    // Se houver niveis fornecidos
     if (widget.niveis != null && widget.niveis!.isNotEmpty) {
       _niveis = widget.niveis!.map((nivel) {
-        // Criar cópia dos niveis com opções clonadas
         final novasOpcoes = nivel.opcoes.map((opcao) {
           return OpcaoNivel(
             codigo: opcao.codigo,
@@ -78,12 +76,10 @@ class _SelecaoOpcoesProdutoWidgetState
       _niveis = [];
     }
 
-    // Restaura seleções anteriores se existirem
     if (widget.item.opcoesNiveis != null) {
       _restaurarSelecoes();
     }
 
-    // Gerar chaves para scroll
     for (var i = 0; i < _niveis.length; i++) {
       _keys.add(GlobalKey());
     }
@@ -92,25 +88,26 @@ class _SelecaoOpcoesProdutoWidgetState
   void _inicializarComplementos() {
     _complementos = [];
 
-    // Se houver grupo definido, buscar complementos
     if (widget.grupo != null && widget.grupo! > 0) {
       ComplementosController()
           .buscaComplementos(grupo: widget.grupo)
           .then((complementos) {
-        // Restaura seleções anteriores se existirem
         if (widget.item.complementos != null) {
           for (var salvo in widget.item.complementos!) {
             var indice =
                 complementos.indexWhere((c) => c.codigo == salvo.codigo);
             if (indice != -1) {
-              complementos[indice].quantidade = salvo.quantidade ?? 0;
-              complementos[indice].selecionado = true;
+              int qtd = salvo.quantidade ?? 0;
+              complementos[indice].quantidade = qtd;
+              complementos[indice].selecionado = qtd > 0;
             }
           }
         }
-        setState(() {
-          _complementos = complementos;
-        });
+        if (mounted) {
+          setState(() {
+            _complementos = complementos;
+          });
+        }
       }).catchError((e) {
         print('Erro ao buscar complementos: $e');
       });
@@ -125,11 +122,9 @@ class _SelecaoOpcoesProdutoWidgetState
         if (indiceOpcao != -1) {
           var opcao = nivel.opcoes[indiceOpcao];
           if (nivel.selecaoMax == 1) {
-            // Escolha única
             for (var o in nivel.opcoes) o.selecionado = false;
             opcao.selecionado = true;
           } else {
-            // Múltipla escolha
             opcao.quantidade = salvo.quantidade;
           }
         }
@@ -171,9 +166,20 @@ class _SelecaoOpcoesProdutoWidgetState
     });
   }
 
+  void _atualizarQuantidadeComplemento(Complementos complemento, int delta) {
+    setState(() {
+      int qtdAtual = complemento.quantidade ?? 0;
+      int novaQtd = qtdAtual + delta;
+      
+      if (novaQtd < 0) novaQtd = 0;
+      
+      complemento.quantidade = novaQtd;
+      complemento.selecionado = novaQtd > 0;
+    });
+  }
+
   double _calcularTotalAdicionais() {
     double total = 0;
-    // Total de níveis
     for (var nivel in _niveis) {
       for (var op in nivel.opcoes) {
         if (nivel.selecaoMax == 1 && op.selecionado) {
@@ -183,7 +189,6 @@ class _SelecaoOpcoesProdutoWidgetState
         }
       }
     }
-    // Total de complementos
     for (var comp in _complementos) {
       if (comp.quantidade != null && comp.quantidade! > 0) {
         total += (comp.valor * comp.quantidade!);
@@ -195,10 +200,9 @@ class _SelecaoOpcoesProdutoWidgetState
   void _salvar() {
     List<OpcaoNivel> listaFinal = [];
 
-    // Adicionar níveis
+    // Processa os Níveis
     for (var nivel in _niveis) {
       if (nivel.selecaoMax == 1) {
-        // Escolha única
         var selecionado = nivel.opcoes.firstWhere((o) => o.selecionado,
             orElse: () => OpcaoNivel(
                   codigo: -1,
@@ -221,7 +225,6 @@ class _SelecaoOpcoesProdutoWidgetState
           ));
         }
       } else {
-        // Múltipla escolha
         for (var op in nivel.opcoes) {
           if (op.quantidade > 0) {
             listaFinal.add(OpcaoNivel(
@@ -238,7 +241,9 @@ class _SelecaoOpcoesProdutoWidgetState
       }
     }
 
-    // Adicionar complementos selecionados
+    // --- CORREÇÃO PRINCIPAL AQUI ---
+    // Mesmo se a lista de complementos estiver vazia, precisamos chamar
+    // o método do controller para que ele LIMPE os complementos antigos.
     if (_complementos.isNotEmpty) {
       List<Complementos> complementosSelecionados = [];
       for (var comp in _complementos) {
@@ -246,10 +251,10 @@ class _SelecaoOpcoesProdutoWidgetState
           complementosSelecionados.add(comp);
         }
       }
-      if (complementosSelecionados.isNotEmpty) {
-        Provider.of<ComandaController>(context, listen: false)
-            .adicionaComplementos(widget.item.codigo, complementosSelecionados);
-      }
+      
+      // Chamada obrigatória para atualizar (mesmo se lista vazia)
+      Provider.of<ComandaController>(context, listen: false)
+          .adicionaComplementos(widget.item.codigo, complementosSelecionados);
     }
 
     Provider.of<ComandaController>(context, listen: false)
@@ -306,27 +311,22 @@ class _SelecaoOpcoesProdutoWidgetState
                 ],
               ),
             ),
-
-            // LISTA DE NIVEIS E COMPLEMENTOS
+            // LISTA
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.only(bottom: 20),
                 itemCount: _niveis.length + (_complementos.isNotEmpty ? 1 : 0),
                 itemBuilder: (context, index) {
-                  // Se estamos nos níveis
                   if (index < _niveis.length) {
                     return _buildNivelContainer(index);
-                  }
-                  // Se chegou ao final, mostrar complementos
-                  else {
+                  } else {
                     return _buildComplementosContainer();
                   }
                 },
               ),
             ),
-
-            // FOOTER (TOTAL + BOTÃO)
+            // FOOTER
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -385,7 +385,6 @@ class _SelecaoOpcoesProdutoWidgetState
 
   Widget _buildNivelContainer(int index) {
     final nivel = _niveis[index];
-
     return Container(
       key: _keys[index],
       child: Column(
@@ -491,7 +490,6 @@ class _SelecaoOpcoesProdutoWidgetState
 
   Widget _buildCounterOption(OpcaoNivel opcao) {
     bool ativo = opcao.quantidade > 0;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
@@ -538,7 +536,8 @@ class _SelecaoOpcoesProdutoWidgetState
               _btnAcao(
                   icon: Icons.add,
                   color: ativo ? Colors.white : Colors.white,
-                  borderColor: ativo ? Colors.amber[600]! : Colors.grey[300]!,
+                  borderColor:
+                      ativo ? Colors.amber[600]! : Colors.grey[300]!,
                   iconColor: ativo ? Colors.amber[700]! : Colors.grey[600]!,
                   onTap: () => _atualizarQuantidade(opcao, 1)),
             ],
@@ -578,7 +577,6 @@ class _SelecaoOpcoesProdutoWidgetState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabeçalho de Complementos
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -597,14 +595,19 @@ class _SelecaoOpcoesProdutoWidgetState
               ],
             ),
           ),
-          // Lista de Complementos
-          ..._complementos.map((complemento) {
-            bool ativo =
-                complemento.quantidade != null && complemento.quantidade! > 0;
+          ..._complementos.asMap().entries.map((entry) {
+            // USANDO CHAVE ÚNICA PARA FORÇAR ATUALIZAÇÃO VISUAL CORRETA
+            int idx = entry.key;
+            Complementos complemento = entry.value;
+            int qtd = complemento.quantidade ?? 0;
+            bool ativo = qtd > 0;
+
             return Container(
+              key: ValueKey('comp_${complemento.codigo}_$idx'),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey[100]!))),
+                  border:
+                      Border(bottom: BorderSide(color: Colors.grey[100]!))),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -615,8 +618,7 @@ class _SelecaoOpcoesProdutoWidgetState
                         Text(complemento.nome ?? "",
                             style: TextStyle(
                                 fontSize: 16,
-                                color:
-                                    ativo ? Colors.black87 : Colors.grey[700],
+                                color: ativo ? Colors.black87 : Colors.grey[700],
                                 fontWeight: ativo
                                     ? FontWeight.w500
                                     : FontWeight.normal)),
@@ -642,7 +644,7 @@ class _SelecaoOpcoesProdutoWidgetState
                         Container(
                           width: 35,
                           alignment: Alignment.center,
-                          child: Text("${complemento.quantidade}",
+                          child: Text("$qtd",
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
@@ -665,15 +667,5 @@ class _SelecaoOpcoesProdutoWidgetState
         ],
       ),
     );
-  }
-
-  void _atualizarQuantidadeComplemento(Complementos complemento, int delta) {
-    setState(() {
-      int novaQtd = (complemento.quantidade ?? 0) + delta;
-      if (novaQtd >= 0) {
-        complemento.quantidade = novaQtd;
-        complemento.selecionado = novaQtd > 0;
-      }
-    });
   }
 }

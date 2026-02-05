@@ -13,7 +13,6 @@ import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/niveis_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
-// import 'package:lanchonete/Services/CupomFiscalService.dart'; // Import opcional
 
 class CategoriaPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
@@ -116,8 +115,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
-  /// Valida se algum item do carrinho tem valor zerado
-  /// Retorna uma mensagem de erro se houver itens com valor zerado, ou null se tudo está ok
+  // Validação de Preço Zerado
   String? _validarItensComValorZerado(List<Itens> itens) {
     for (var item in itens) {
       double valorBaseUnitario = item.valor ?? 0;
@@ -137,16 +135,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
       double valorTotalUnitario = valorBaseUnitario + valorAdicionaisUnitario;
 
-      // Verificar se o valor total do item é zero
       if (valorTotalUnitario <= 0) {
         return 'O item "${item.nome}" tem valor zerado ou inválido. Verifique o preço do produto.';
       }
     }
-
-    return null; // Tudo está ok
+    return null;
   }
 
-  /// Exibe um diálogo de aviso quando há itens com valor zerado
   Future<void> _exibirAvisoValorZerado(String mensagem) async {
     return showDialog<void>(
       context: context,
@@ -165,11 +160,9 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              "OK",
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+            child: const Text("OK",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -180,8 +173,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
             title: const Text("Remover Item",
                 style: TextStyle(fontWeight: FontWeight.bold)),
             content: const Text(
@@ -207,6 +200,68 @@ class _CategoriaPageState extends State<CategoriaPage> {
           ),
         ) ??
         false;
+  }
+
+  // --- LÓGICA DE ORDENAÇÃO DE EXTRAS (Tamanho/Unidade Primeiro) ---
+  List<Map<String, dynamic>> _getExtrasOrdenados(Itens item) {
+    List<Map<String, dynamic>> extras = [];
+
+    // Adiciona Complementos
+    if (item.complementos != null) {
+      for (var c in item.complementos!) {
+        extras.add({
+          'nome': c.nome,
+          'qtd': c.quantidade,
+          'valor': c.valor * c.quantidade,
+          'tipo': 'complemento'
+        });
+      }
+    }
+
+    // Adiciona Opções de Nível
+    if (item.opcoesNiveis != null) {
+      for (var op in item.opcoesNiveis!) {
+        extras.add({
+          'nome': op.nome,
+          'qtd': op.quantidade,
+          'valor': op.valorAdicional * op.quantidade,
+          'tipo': 'opcao'
+        });
+      }
+    }
+
+    // Palavras-chave que indicam prioridade
+    final prioridades = [
+      'TAMANHO', 'TAM', 'UNIDADE', 'UN', 'UNID',
+      'PEQUENO', 'MEDIO', 'MÉDIO', 'GRANDE', 'GIGANTE', 'FAMILIA',
+      ' P ', ' M ', ' G ', ' GG ', // Espaços para evitar falsos positivos
+      '(P)', '(M)', '(G)', '(GG)',
+      ' P', ' M', ' G', ' GG' // Fim de frase
+    ];
+
+    bool isPrioridade(String nome) {
+      String n = nome.toUpperCase();
+      // Verifica igualdade exata para letras soltas
+      if (['P', 'M', 'G', 'GG'].contains(n.trim())) return true;
+      
+      // Verifica conter palavras-chave
+      for (var p in prioridades) {
+        if (n.contains(p)) return true;
+      }
+      return false;
+    }
+
+    // Ordena: Prioritários primeiro, o resto mantém a ordem de inserção
+    extras.sort((a, b) {
+      bool aPri = isPrioridade(a['nome'] ?? '');
+      bool bPri = isPrioridade(b['nome'] ?? '');
+
+      if (aPri && !bPri) return -1; // A vem primeiro
+      if (!aPri && bPri) return 1;  // B vem primeiro
+      return 0; // Mantém ordem original
+    });
+
+    return extras;
   }
 
   Widget _buildCategoriaTab(Categoria item) {
@@ -335,12 +390,12 @@ class _CategoriaPageState extends State<CategoriaPage> {
     double valorBaseUnitario = item.valor ?? 0;
     double valorAdicionaisUnitario = 0;
 
+    // Calcula valor para lógica de preço (mantido original)
     if (item.complementos != null) {
       for (var comp in item.complementos!) {
         valorAdicionaisUnitario += (comp.valor * comp.quantidade);
       }
     }
-
     if (item.opcoesNiveis != null) {
       for (var op in item.opcoesNiveis!) {
         valorAdicionaisUnitario += (op.valorAdicional * op.quantidade);
@@ -349,6 +404,9 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
     double valorTotalLinha =
         (valorBaseUnitario + valorAdicionaisUnitario) * (item.quantidade ?? 1);
+
+    // Obtém lista mesclada e ORDENADA (Tamanho primeiro) para exibição
+    List<Map<String, dynamic>> extrasExibicao = _getExtrasOrdenados(item);
 
     return Dismissible(
       key: Key("item_${item.codigo}_${DateTime.now().millisecondsSinceEpoch}"),
@@ -387,12 +445,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: const BoxDecoration(
-              border:
-                  Border(bottom: BorderSide(color: Colors.black12, width: 0.5)),
+              border: Border(
+                  bottom: BorderSide(color: Colors.black12, width: 0.5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Título e Botão Remover
                 Row(
                   children: [
                     Expanded(
@@ -419,6 +478,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     ),
                   ],
                 ),
+                
+                // Preços
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(
@@ -426,15 +487,17 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     children: [
                       Text(
                           "${item.quantidade}x  ${_formatMoeda.format(valorBaseUnitario)}",
-                          style:
-                              TextStyle(color: Colors.grey[600], fontSize: 13)),
+                          style: TextStyle(
+                              color: Colors.grey[600], fontSize: 13)),
                       Text(_formatMoeda.format(valorTotalLinha),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                     ],
                   ),
                 ),
-                if (item.complementos != null && item.complementos!.isNotEmpty)
+                
+                // LISTA DE EXTRAS UNIFICADA E ORDENADA
+                if (extrasExibicao.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
                     padding: const EdgeInsets.all(8),
@@ -443,8 +506,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         borderRadius: BorderRadius.circular(8)),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: item.complementos!
-                          .map((c) => Padding(
+                      children: extrasExibicao
+                          .map((extra) => Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: Row(
                                   mainAxisAlignment:
@@ -452,13 +515,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                   children: [
                                     Flexible(
                                         child: Text(
-                                            "+ ${c.nome} (${c.quantidade}x)",
+                                            "+ ${extra['nome']} (${extra['qtd']}x)",
                                             style: const TextStyle(
                                                 color: Colors.black87,
                                                 fontSize: 12),
                                             overflow: TextOverflow.ellipsis)),
                                     Text(
-                                        "${_formatMoeda.format(c.valor * c.quantidade)}",
+                                        "${_formatMoeda.format(extra['valor'])}",
                                         style: const TextStyle(
                                             color: Colors.black54,
                                             fontSize: 12)),
@@ -468,40 +531,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
                           .toList(),
                     ),
                   ),
-                if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 6),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: item.opcoesNiveis!
-                          .map((op) => Padding(
-                                padding: const EdgeInsets.only(bottom: 2),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Flexible(
-                                        child: Text(
-                                            "+ ${op.nome} (${op.quantidade}x)",
-                                            style: const TextStyle(
-                                                color: Colors.black87,
-                                                fontSize: 12),
-                                            overflow: TextOverflow.ellipsis)),
-                                    Text(
-                                        "${_formatMoeda.format(op.valorAdicional * op.quantidade)}",
-                                        style: const TextStyle(
-                                            color: Colors.black54,
-                                            fontSize: 12)),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                  ),
+
+                // Observações
                 if (item.obs != null && item.obs!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -536,11 +567,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.1), blurRadius: 10)
             ],
           ),
           child: Column(
             children: [
+              // Cabeçalho da Comanda
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.amber[500],
@@ -571,6 +604,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   ],
                 ),
               ),
+              
+              // Lista de Itens da Comanda
               Expanded(
                 child: controller.isEmpty
                     ? Center(
@@ -592,11 +627,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         ),
                       ),
               ),
+              
+              // Rodapé com Total e Botão
               Container(
                 decoration: BoxDecoration(
                     color: Colors.grey[50],
-                    border:
-                        const Border(top: BorderSide(color: Colors.black12))),
+                    border: const Border(
+                        top: BorderSide(color: Colors.black12))),
                 child: SafeArea(
                   top: false,
                   child: Padding(
@@ -626,19 +663,18 @@ class _CategoriaPageState extends State<CategoriaPage> {
                             onPressed: controller.isEmpty
                                 ? null
                                 : () async {
-                                    // Validar se algum item tem valor zerado
+                                    // Validações antes de pagar
                                     String? erroValidacao =
                                         _validarItensComValorZerado(
                                             controller.itens);
 
                                     if (erroValidacao != null) {
-                                      // Exibir aviso e não prosseguir
                                       await _exibirAvisoValorZerado(
                                           erroValidacao);
                                       return;
                                     }
 
-                                    // Vai para pagamento
+                                    // Navega para Pagamento
                                     await Navigator.pushNamed(
                                       context,
                                       '/payment_mode',
@@ -676,14 +712,12 @@ class _CategoriaPageState extends State<CategoriaPage> {
         leading: IconButton(
           icon: const Icon(Icons.menu, color: Colors.black87),
           onPressed: () {
-            // CORREÇÃO CRUCIAL PARA TABLET:
-            // Remove o foco do teclado antes de tentar abrir o menu
+            // Foco: Fecha teclado antes de abrir menu (para tablets)
             FocusScope.of(context).unfocus();
 
             if (widget.onOpenDrawer != null) {
               widget.onOpenDrawer!();
             } else {
-              // Fallback caso a navegação tenha sido feita incorretamente
               try {
                 Scaffold.of(context).openDrawer();
               } catch (_) {}
