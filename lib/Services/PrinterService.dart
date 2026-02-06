@@ -8,6 +8,8 @@ import 'package:lanchonete/Models/empresa_model.dart';
 import 'package:lanchonete/Services/EmpresaService.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'PrinterServicePDF.dart';
+
 class PrinterService {
   static const int _printerPort = 9100;
   static const Duration _connectionTimeout = Duration(seconds: 4);
@@ -95,13 +97,11 @@ class PrinterService {
       required int orderNumber,
       required double totalValue,
       bool isParaLevar = false}) async {
-    if (kIsWeb) return false;
-
     final prefs = await SharedPreferences.getInstance();
     final ipCaixa = prefs.getString('printer_ip_caixa');
     final ipCozinha = prefs.getString('printer_ip_cozinha');
 
-    if (ipCaixa == null || ipCaixa.isEmpty) {
+    if (!kIsWeb & (ipCaixa == null || ipCaixa.isEmpty)) {
       print("ERRO: IP da impressora do caixa não configurado.");
       return false;
     }
@@ -126,8 +126,11 @@ class PrinterService {
 
     // 1. IMPRESSORA CAIXA
     try {
-      final socketCaixa = await Socket.connect(ipCaixa, _printerPort,
-          timeout: _connectionTimeout);
+      late Socket socketCaixa;
+      if (!kIsWeb) {
+        socketCaixa = await Socket.connect(ipCaixa, _printerPort,
+            timeout: _connectionTimeout);
+      }
 
       List<int> bytes = await _generateReceiptBytes(
           itens, orderNumber, totalValue, profile, dadosEmpresa);
@@ -138,8 +141,12 @@ class PrinterService {
             tituloSetor: "COZINHA (GERAL)", isParaLevar: isParaLevar));
       }
 
-      socketCaixa.add(Uint8List.fromList(bytes));
-      await socketCaixa.flush();
+      if (!kIsWeb) {
+        socketCaixa.add(Uint8List.fromList(bytes));
+        await socketCaixa.flush();
+      } else {
+        printPdfFromBytes(bytes);
+      }
       await socketCaixa.close();
       sucesso = true;
     } catch (e) {
@@ -149,16 +156,22 @@ class PrinterService {
     // 2. IMPRESSORA COZINHA
     if (itensPastel.isNotEmpty && ipCozinha != null && ipCozinha.isNotEmpty) {
       try {
-        final socketCozinha = await Socket.connect(ipCozinha, _printerPort,
-            timeout: _connectionTimeout);
+        late Socket socketCozinha;
+        if (!kIsWeb) {
+          socketCozinha = await Socket.connect(ipCozinha, _printerPort,
+              timeout: _connectionTimeout);
+        }
 
         List<int> bytes = await _generateKitchenBytes(
             itensPastel, orderNumber, profile,
             tituloSetor: "COZINHA (PASTEL)", isParaLevar: isParaLevar);
-
-        socketCozinha.add(Uint8List.fromList(bytes));
-        await socketCozinha.flush();
-        await socketCozinha.close();
+        if (kIsWeb) {
+          socketCozinha.add(Uint8List.fromList(bytes));
+          await socketCozinha.flush();
+          await socketCozinha.close();
+        } else {
+          printPdfFromBytes(bytes);
+        }
       } catch (e) {
         print("Erro Cozinha: $e");
       }

@@ -5,7 +5,6 @@ import 'package:lanchonete/Pages/Principal_page.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:lanchonete/Services/Local_storage.Service.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:provider/provider.dart';
 
 import '../Components/customDropDown.dart';
@@ -17,7 +16,6 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final controllerSenha = TextEditingController();
-  final auth = LocalAuthentication();
 
   final _formKey = GlobalKey<FormState>();
 

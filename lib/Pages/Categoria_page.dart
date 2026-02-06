@@ -173,8 +173,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
     return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text("Remover Item",
                 style: TextStyle(fontWeight: FontWeight.bold)),
             content: const Text(
@@ -243,7 +243,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       String n = nome.toUpperCase();
       // Verifica igualdade exata para letras soltas
       if (['P', 'M', 'G', 'GG'].contains(n.trim())) return true;
-      
+
       // Verifica conter palavras-chave
       for (var p in prioridades) {
         if (n.contains(p)) return true;
@@ -257,7 +257,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       bool bPri = isPrioridade(b['nome'] ?? '');
 
       if (aPri && !bPri) return -1; // A vem primeiro
-      if (!aPri && bPri) return 1;  // B vem primeiro
+      if (!aPri && bPri) return 1; // B vem primeiro
       return 0; // Mantém ordem original
     });
 
@@ -307,7 +307,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
     );
   }
 
-  Widget _buildCatalogoArea() {
+  Widget _buildCatalogoAreaSemCategoria() {
     if (_erroMensagem != null) {
       return Center(
         child: Column(
@@ -325,64 +325,37 @@ class _CategoriaPageState extends State<CategoriaPage> {
       );
     }
 
-    return Column(
-      children: [
-        Container(
-          height: 80,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-          color: const Color(0xFFF5F5F7),
-          child: _isLoadingCategorias
-              ? const Center(child: CircularProgressIndicator())
-              : ScrollConfiguration(
-                  behavior: ScrollConfiguration.of(context)
-                      .copyWith(scrollbars: false),
-                  child: ListView.builder(
-                    controller: _categoriasScrollController,
-                    scrollDirection: Axis.horizontal,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _categorias.length,
-                    itemBuilder: (context, index) =>
-                        _buildCategoriaTab(_categorias[index]),
+    return Container(
+      color: const Color(0xFFF5F5F7),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: _isLoadingProdutos
+          ? Center(child: CircularProgressIndicator(color: Colors.amber[700]))
+          : _produtos.isEmpty
+              ? const Center(child: Text("Nenhum produto nesta categoria"))
+              : Scrollbar(
+                  controller: _produtosScrollController,
+                  thumbVisibility: true,
+                  radius: const Radius.circular(8),
+                  child: GridView.builder(
+                    controller: _produtosScrollController,
+                    padding: const EdgeInsets.only(
+                        bottom: 40, top: 10, left: 4, right: 4),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 190,
+                      childAspectRatio: 0.75,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                    itemCount: _produtos.length,
+                    itemBuilder: (context, index) {
+                      return ProdutoItem(
+                        produto: _produtos[index],
+                        categoria: _selectedCategoriaId ?? 0,
+                      );
+                    },
                   ),
                 ),
-        ),
-        Expanded(
-          child: Container(
-            color: const Color(0xFFF5F5F7),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _isLoadingProdutos
-                ? Center(
-                    child: CircularProgressIndicator(color: Colors.amber[700]))
-                : _produtos.isEmpty
-                    ? const Center(
-                        child: Text("Nenhum produto nesta categoria"))
-                    : Scrollbar(
-                        controller: _produtosScrollController,
-                        thumbVisibility: true,
-                        radius: const Radius.circular(8),
-                        child: GridView.builder(
-                          controller: _produtosScrollController,
-                          padding: const EdgeInsets.only(
-                              bottom: 40, top: 10, left: 4, right: 4),
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 190,
-                            childAspectRatio: 0.75,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: _produtos.length,
-                          itemBuilder: (context, index) {
-                            return ProdutoItem(
-                              produto: _produtos[index],
-                              categoria: _selectedCategoriaId ?? 0,
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -445,8 +418,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             decoration: const BoxDecoration(
-              border: Border(
-                  bottom: BorderSide(color: Colors.black12, width: 0.5)),
+              border:
+                  Border(bottom: BorderSide(color: Colors.black12, width: 0.5)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -478,7 +451,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     ),
                   ],
                 ),
-                
+
                 // Preços
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -487,15 +460,15 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     children: [
                       Text(
                           "${item.quantidade}x  ${_formatMoeda.format(valorBaseUnitario)}",
-                          style: TextStyle(
-                              color: Colors.grey[600], fontSize: 13)),
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 13)),
                       Text(_formatMoeda.format(valorTotalLinha),
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                     ],
                   ),
                 ),
-                
+
                 // LISTA DE EXTRAS UNIFICADA E ORDENADA
                 if (extrasExibicao.isNotEmpty)
                   Container(
@@ -567,8 +540,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.1), blurRadius: 10)
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
             ],
           ),
           child: Column(
@@ -604,7 +576,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   ],
                 ),
               ),
-              
+
               // Lista de Itens da Comanda
               Expanded(
                 child: controller.isEmpty
@@ -627,13 +599,13 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         ),
                       ),
               ),
-              
+
               // Rodapé com Total e Botão
               Container(
                 decoration: BoxDecoration(
                     color: Colors.grey[50],
-                    border: const Border(
-                        top: BorderSide(color: Colors.black12))),
+                    border:
+                        const Border(top: BorderSide(color: Colors.black12))),
                 child: SafeArea(
                   top: false,
                   child: Padding(
@@ -736,10 +708,37 @@ class _CategoriaPageState extends State<CategoriaPage> {
               onPressed: _carregarDadosIniciais),
         ],
       ),
-      body: Row(
+      body: Column(
         children: [
-          Expanded(child: _buildCatalogoArea()),
-          _buildComandaSidebar(),
+          // Categoria Tab - Acima de tudo
+          Container(
+            height: 65,
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            color: const Color(0xFFF5F5F7),
+            child: _isLoadingCategorias
+                ? const Center(child: CircularProgressIndicator())
+                : ScrollConfiguration(
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(scrollbars: false),
+                    child: ListView.builder(
+                      controller: _categoriasScrollController,
+                      scrollDirection: Axis.horizontal,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      itemCount: _categorias.length,
+                      itemBuilder: (context, index) =>
+                          _buildCategoriaTab(_categorias[index]),
+                    ),
+                  ),
+          ),
+          // Conteúdo principal em Row
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: _buildCatalogoAreaSemCategoria()),
+                _buildComandaSidebar(),
+              ],
+            ),
+          ),
         ],
       ),
     );
