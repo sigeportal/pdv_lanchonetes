@@ -144,17 +144,17 @@ class PrinterService {
       if (!kIsWeb) {
         socketCaixa.add(Uint8List.fromList(bytes));
         await socketCaixa.flush();
+        await socketCaixa.close();
       } else {
-        printPdfFromBytes(bytes);
+        printPdfFromBytes(Uint8List.fromList(bytes));
       }
-      await socketCaixa.close();
       sucesso = true;
     } catch (e) {
       print("Erro Caixa: $e");
     }
 
     // 2. IMPRESSORA COZINHA
-    if (itensPastel.isNotEmpty && ipCozinha != null && ipCozinha.isNotEmpty) {
+    if (itensPastel.isNotEmpty) {
       try {
         late Socket socketCozinha;
         if (!kIsWeb) {
@@ -165,12 +165,12 @@ class PrinterService {
         List<int> bytes = await _generateKitchenBytes(
             itensPastel, orderNumber, profile,
             tituloSetor: "COZINHA (PASTEL)", isParaLevar: isParaLevar);
-        if (kIsWeb) {
+        if (!kIsWeb) {
           socketCozinha.add(Uint8List.fromList(bytes));
           await socketCozinha.flush();
           await socketCozinha.close();
         } else {
-          printPdfFromBytes(bytes);
+          printPdfFromBytes(Uint8List.fromList(bytes));
         }
       } catch (e) {
         print("Erro Cozinha: $e");
