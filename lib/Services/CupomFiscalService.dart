@@ -75,8 +75,8 @@ class OrderNumberService {
 
       return senhaAtual;
     } catch (e) {
-      print("ERRO ao obter senha do servidor (Usando Fallback Local): $e");
-      return await _generateLocalOrderNumber(ehNovoDia, hojeStr, prefs);
+      print("ERRO ao obter senha do servidor (tentando novamente): $e");
+      return await generateNextOrderNumber();
     }
   }
 

@@ -395,4 +395,87 @@ class PrinterService {
 
     return bytes;
   }
+
+  // --- TESTE DE COMUNICAÇÃO COM IMPRESSORA ---
+  static Future<Map<String, dynamic>> testPrinterConnection(
+      String printerIp) async {
+    try {
+      if (printerIp.isEmpty) {
+        return {
+          'success': false,
+          'message': 'IP não configurado',
+          'error': 'Por favor, configure um IP válido'
+        };
+      }
+
+      final socket = await Socket.connect(
+        printerIp,
+        _printerPort,
+        timeout: _connectionTimeout,
+      );
+
+      // Se conseguiu conectar, envia um comando simples de teste
+      try {
+        final testCommand = [0x1B, 0x40]; // ESC @ - Reset da impressora
+        socket.add(testCommand);
+        await socket.flush();
+      } catch (e) {
+        print("Erro ao enviar comando de teste: $e");
+      }
+
+      await socket.close();
+
+      return {
+        'success': true,
+        'message': 'Impressora encontrada e respondendo',
+        'error': null,
+        'ip': printerIp
+      };
+    } on SocketException catch (e) {
+      String errorMessage = 'Erro desconhecido';
+
+      if (e.osError?.message.contains('Connection refused') ?? false) {
+        errorMessage =
+            'Conexão recusada - Impressora offline ou porta incorreta';
+      } else if (e.osError?.message.contains('Host unreachable') ?? false) {
+        errorMessage =
+            'Host não alcançável - IP incorreto ou impressora desligada';
+      } else if (e.osError?.message.contains('Connection timed out') ?? false) {
+        errorMessage = 'Timeout - Impressora não responde no tempo limite';
+      } else if (e.message.contains('Failed to lookup')) {
+        errorMessage = 'IP inválido ou não resolvível';
+      } else {
+        errorMessage = e.message;
+      }
+
+      return {
+        'success': false,
+        'message': 'Falha na comunicação',
+        'error': errorMessage,
+        'ip': printerIp
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Erro ao conectar',
+        'error': e.toString(),
+        'ip': printerIp
+      };
+    }
+  }
+
+  // --- TESTE DE AMBAS AS IMPRESSORAS ---
+  static Future<Map<String, Map<String, dynamic>>> testAllPrinters() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ipCaixa = prefs.getString('printer_ip_caixa') ?? '';
+    final ipCozinha = prefs.getString('printer_ip_cozinha') ?? '';
+
+    final resultCaixa = await testPrinterConnection(ipCaixa);
+    final resultCozinha = await testPrinterConnection(ipCozinha);
+
+    return {
+      'caixa': resultCaixa,
+      'cozinha': resultCozinha,
+    };
+  }
 }
