@@ -53,7 +53,7 @@ class _ProdutoItemState extends State<ProdutoItem> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
+          onTap: () async {
             // Lógica unificada de clique no card
             if (widget.produto!.grade > 0) {
               // Se houver grade, abrir widget de grade

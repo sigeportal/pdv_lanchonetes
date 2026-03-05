@@ -68,19 +68,22 @@ class ComandaController extends ChangeNotifier {
 
     itens.add(
       Itens(
-          // Gera um código único baseado no timestamp para garantir unicidade na lista
-          codigo: DateTime.now().millisecondsSinceEpoch,
-          produto: produto.codigo,
-          quantidade: quantidade,
-          valor: produto.valor,
-          nome: produto.nome,
-          grade: produto.grade,
-          codGrupo: produto.grupo,
-          gradeProduto: gradeProduto,
-          usuario: usuario,
-          idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
-          complementos: [],
-          opcoesNiveis: []),
+        // Gera um código único baseado no timestamp para garantir unicidade na lista
+        codigo: DateTime.now().millisecondsSinceEpoch,
+        produto: produto.codigo,
+        quantidade: quantidade,
+        valor: produto.valor,
+        nome: produto.nome,
+        grade: produto.grade,
+        codGrupo: produto.grupo,
+        gradeProduto: gradeProduto,
+        usuario: usuario,
+        idAgrupamento: (gradeProduto != null) ? idAgrupamento : '',
+        complementos: [],
+        opcoesNiveis: [],
+        isBebida: produto.g1_nome.toLowerCase().contains('bebida'),
+        isPastel: produto.g1_nome.toLowerCase().contains('past'),
+      ),
     );
 
     notifyListeners();

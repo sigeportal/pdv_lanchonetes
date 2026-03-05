@@ -18,6 +18,8 @@ class Itens {
   GradeProduto? gradeProduto;
   int? usuario;
   String? idAgrupamento;
+  bool? isBebida;
+  bool? isPastel;
 
   Itens(
       {this.id,
@@ -34,7 +36,9 @@ class Itens {
       this.codGrupo,
       this.gradeProduto,
       this.usuario,
-      this.idAgrupamento}) {
+      this.idAgrupamento,
+      this.isBebida,
+      this.isPastel}) {
     if (this.complementos == null) {
       this.complementos = <Complementos>[];
     }

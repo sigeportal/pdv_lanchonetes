@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/empresa_model.dart';
 import 'package:lanchonete/Services/EmpresaService.dart';
+import 'package:lanchonete/repositories/dataset_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'PrinterServicePDF.dart';
@@ -109,15 +111,15 @@ class PrinterService {
     Empresa dadosEmpresa = await EmpresaService.fetchDadosEmpresa();
     CapabilityProfile profile = await CapabilityProfile.load();
 
-    bool temPastel = itens.any((item) => _isPastel(item));
+    bool temPastel = itens.any((item) => item.isPastel!);
     List<Itens> itensGeral = [];
     List<Itens> itensPastel = [];
 
     if (temPastel) {
       itensPastel =
-          itens.where((item) => _isPastel(item) || _isBebida(item)).toList();
+          itens.where((item) => item.isPastel! || item.isBebida!).toList();
       itensGeral =
-          itens.where((item) => !_isPastel(item) && !_isBebida(item)).toList();
+          itens.where((item) => !item.isPastel! && !item.isBebida!).toList();
     } else {
       itensGeral = List.from(itens);
     }
@@ -178,20 +180,6 @@ class PrinterService {
     }
 
     return sucesso;
-  }
-
-  static bool _isPastel(Itens item) =>
-      (item.nome ?? '').toLowerCase().contains('pastel');
-
-  static bool _isBebida(Itens item) {
-    String nome = (item.nome ?? '').toLowerCase();
-    return nome.contains('bebida') ||
-        nome.contains('refri') ||
-        nome.contains('suco') ||
-        nome.contains('agua') ||
-        nome.contains('cerveja') ||
-        nome.contains('coca') ||
-        nome.contains('lata');
   }
 
   // --- GERADOR CUPOM CLIENTE ---
@@ -316,7 +304,8 @@ class PrinterService {
     final generator = Generator(PaperSize.mm80, profile);
     List<int> bytes = [];
     bytes += generator.reset();
-
+    //espaços em branco
+    bytes += generator.feed(6);
     if (isParaLevar) {
       bytes += generator.text('* VIAGEM / PARA LEVAR *',
           styles: const PosStyles(

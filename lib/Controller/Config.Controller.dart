@@ -2,6 +2,8 @@ import 'package:lanchonete/Interfaces/Local_Storage.Interface.dart';
 import 'package:lanchonete/Services/Local_storage.Service.dart';
 import 'package:flutter/material.dart';
 
+import '../repositories/dataset_repository.dart';
+
 class ConfigController {
   static final ConfigController instance = ConfigController._();
   final ILocalStorage storage = LocalStorageService();

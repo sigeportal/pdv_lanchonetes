@@ -257,13 +257,13 @@ class _WidgetGradeProdutoState extends State<WidgetGradeProduto> {
                   .fetchGradeProduto(item.produto, tamanhoSelecionado.value);
               comandaController.adicionaItem(
                 Produtos(
-                  codigo: item.produto,
-                  nome: item.nome,
-                  valor: grade.valor * item.quantidade,
-                  categoria: widget.categoria,
-                  grade: grade.codigo,
-                  grupo: 0,
-                ),
+                    codigo: item.produto,
+                    nome: item.nome,
+                    valor: grade.valor * item.quantidade,
+                    categoria: widget.categoria,
+                    grade: grade.codigo,
+                    grupo: 0,
+                    g1_nome: ''),
                 idAgrupamento,
                 gradeProduto: grade,
                 quantidade: item.quantidade,
