@@ -3,6 +3,10 @@ import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Services/PrinterService.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 
+// --- IMPORTS ADICIONADOS PARA A NAVEGAÇÃO CORRETA ---
+import 'package:lanchonete/Controller/Config.Controller.dart';
+import 'package:lanchonete/Pages/Principal_page.dart';
+
 class ReimpressaoCupomPage extends StatefulWidget {
   final List<Itens> itens;
   final int numeroPedido;
@@ -21,6 +25,22 @@ class ReimpressaoCupomPage extends StatefulWidget {
 
 class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
   bool _isReprinting = false;
+
+  // --- NOVA LÓGICA DE NAVEGAÇÃO PÓS-VENDA ---
+  void _voltarAoInicio() {
+    bool usarMesas = ConfigController.instance.useTables.value;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrincipalPage(
+          // Se usa mesas, vai pra tela de Mesas. Se não, vai pra Categorias.
+          paginas: usarMesas ? Paginas.mesas : Paginas.categorias,
+        ),
+      ),
+      (route) => false,
+    );
+  }
 
   Future<void> _reimprimirCupom() async {
     setState(() {
@@ -92,7 +112,8 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          // Alterado de pop() para voltar ao início de forma segura
+          onPressed: _voltarAoInicio,
         ),
       ),
       body: Center(
@@ -193,7 +214,7 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
                               ),
                             ),
                             Text(
-                              "R\$ ${widget.totalValue.toStringAsFixed(2)}",
+                              "R\$ ${widget.totalValue.toStringAsFixed(2).replaceAll('.', ',')}",
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -237,7 +258,7 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
                 // Botões de ação
                 Row(
                   children: [
-                    // Botão Cancelar
+                    // Botão Cancelar/Voltar (Renomeado para fazer mais sentido no fim do fluxo)
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -249,14 +270,14 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
                         ),
                         onPressed: _isReprinting
                             ? null
-                            : () => Navigator.of(context).pop(),
+                            : _voltarAoInicio, // Usando a nova rota segura
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.close, color: Colors.white),
+                            const Icon(Icons.arrow_back, color: Colors.white),
                             const SizedBox(width: 8),
                             const Text(
-                              "Cancelar",
+                              "Novo Pedido",
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -283,7 +304,7 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             _isReprinting
-                                ? SizedBox(
+                                ? const SizedBox(
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
@@ -296,7 +317,7 @@ class _ReimpressaoCupomPageState extends State<ReimpressaoCupomPage> {
                                 : const Icon(Icons.print, color: Colors.white),
                             const SizedBox(width: 8),
                             Text(
-                              _isReprinting ? "Reimprimindo..." : "Reimprimir",
+                              _isReprinting ? "Imprimindo..." : "Reimprimir",
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

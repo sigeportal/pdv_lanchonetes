@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:lanchonete/Controller/usuario_controller.dart';
 import 'package:lanchonete/Pages/Config_page.dart';
 import 'package:lanchonete/Pages/Principal_page.dart';
@@ -147,12 +148,15 @@ class _LoginPageState extends State<LoginPage> {
               final login = await localStorage.get('usuario');
               final usuarioController =
                   Provider.of<UsuarioController>(context, listen: false);
+
               if (await usuarioController.logar(login, controllerSenha.text)) {
+                // VERIFICA SE USA MESAS OU VAI DIRETO PARA CATEGORIAS
+                bool usarMesas = ConfigController.instance.useTables.value;
                 Navigator.pushReplacement(
                   context,
                   CupertinoPageRoute(
                     builder: (_) => PrincipalPage(
-                      paginas: Paginas.categorias,
+                      paginas: usarMesas ? Paginas.mesas : Paginas.categorias,
                     ),
                   ),
                 );

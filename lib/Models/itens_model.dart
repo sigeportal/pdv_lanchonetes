@@ -52,20 +52,35 @@ class Itens {
       codigo: json['cpCodigo'] ?? 0,
       produto: json['cpPro'] ?? 0,
       estado: json['cpEstado'] ?? '',
-      valor: json['cpValor'] * 100 / 100 ?? 0,
-      quantidade: json['cpQuantidade'] * 100 / 100 ?? 0,
+
+      // Conversões seguras para evitar erro de matemática com null
+      valor: json['cpValor'] != null ? (json['cpValor']).toDouble() : 0.0,
+      quantidade: json['cpQuantidade'] != null
+          ? (json['cpQuantidade']).toDouble()
+          : 0.0,
+
       obs: json['cpObs'] ?? '',
       grade: json['cpGra'] ?? 0,
       nome: json['nome'] ?? '',
-      gradeProduto: json['cpGra'] != 0
+
+      // Proteção contra gradeProduto nulo
+      gradeProduto: json['cpGra'] != 0 && json['gradeProduto'] != null
           ? GradeProduto.fromMap(json['gradeProduto'])
           : GradeProduto(codigo: 0, valor: 0, tamanho: ''),
-      complementos: (json['complementos'] as List)
-          .map((e) => Complementos.fromJson(e))
-          .toList(),
-      opcoesNiveis: (json['opcoesNivel'] as List)
-          .map((e) => OpcaoNivel.fromJson(e))
-          .toList(),
+
+      // --- CORREÇÃO PRINCIPAL: Verificações seguras para Listas ---
+      complementos: json['complementos'] != null
+          ? (json['complementos'] as List)
+              .map((e) => Complementos.fromJson(e))
+              .toList()
+          : <Complementos>[],
+
+      opcoesNiveis: json['opcoesNivel'] != null
+          ? (json['opcoesNivel'] as List)
+              .map((e) => OpcaoNivel.fromJson(e))
+              .toList()
+          : <OpcaoNivel>[],
+
       usuario: json['usuario'],
       idAgrupamento: json['idAgrupamento'],
     );
@@ -83,10 +98,10 @@ class Itens {
       "codGrupo": codGrupo,
       "nome": nome,
       "gradeProduto": gradeProduto != null ? gradeProduto!.toJson() : null,
-      "complementos": complementos != null
+      "complementos": complementos != null && complementos!.isNotEmpty
           ? complementos!.map((c) => c.toJson()).toList()
           : null,
-      "opcoesNivel": opcoesNiveis != null
+      "opcoesNivel": opcoesNiveis != null && opcoesNiveis!.isNotEmpty
           ? opcoesNiveis!.map((c) => c.toJson()).toList()
           : null,
       "usuario": usuario,

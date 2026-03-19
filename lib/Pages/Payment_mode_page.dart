@@ -2,7 +2,6 @@ import 'package:lanchonete/Components/payment_option_tile.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:get/get.dart';
 import 'package:lanchonete/Models/venda_model.dart';
 import 'package:lanchonete/Models/cliente_model.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
@@ -10,16 +9,22 @@ import 'package:lanchonete/Pages/ReimpressaoCupom_page.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:lanchonete/Controller/Config.Controller.dart';
+import 'package:lanchonete/Pages/Principal_page.dart';
+import 'package:lanchonete/Services/ComandaService.dart'; // --- IMPORT ADICIONADO PARA FECHAR COMANDA ---
+
 import '../Services/CupomFiscalService.dart';
 import '../Services/PrinterService.dart';
 import '../Services/ClienteService.dart';
 
 class PaymentModePage extends StatefulWidget {
   final double valorPagamento;
+  final int? mesaId; // --- NOVO: RECEBE A MESA PARA ENCERRAMENTO ---
 
   const PaymentModePage({
     Key? key,
     required this.valorPagamento,
+    this.mesaId,
   }) : super(key: key);
 
   @override
@@ -27,14 +32,12 @@ class PaymentModePage extends StatefulWidget {
 }
 
 class _PaymentModePageState extends State<PaymentModePage> {
-  //final TefController _tefController = Get.find();
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   List<PFParcela> _pagamentos = [];
   Cliente? _clienteSelecionado;
 
-  // --- NOVO ESTADO: PARA LEVAR ---
   bool _isParaLevar = false;
 
   double get _totalPago => _pagamentos.fold(0, (sum, p) => sum + p.valor);
@@ -60,7 +63,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // CABEÇALHO COMPACTO
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8),
@@ -82,13 +84,10 @@ class _PaymentModePageState extends State<PaymentModePage> {
               ),
             ),
             const Divider(height: 1),
-
-            // CORPO
             Expanded(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // LADO ESQUERDO: Botões
                   Expanded(
                     flex: 6,
                     child: Container(
@@ -97,8 +96,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
                       child: _buildPaymentOptionsGrid(isHorizontal),
                     ),
                   ),
-
-                  // LADO DIREITO: Configuração e Lista
                   Expanded(
                     flex: 4,
                     child: Container(
@@ -109,7 +106,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
                       ),
                       child: Column(
                         children: [
-                          // --- NOVO: SELETOR DE TIPO DE PEDIDO ---
                           Container(
                             margin: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
@@ -152,7 +148,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
                             ),
                           ),
                           const Divider(height: 1),
-
                           Container(
                             padding: const EdgeInsets.all(10),
                             color: Colors.grey[100],
@@ -446,7 +441,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
     return showDialog<double>(
       context: context,
       builder: (context) {
-        // Função para validar e confirmar o valor
         void _confirmarValor() {
           String text =
               controller.text.replaceAll('.', '').replaceAll(',', '.');
@@ -737,10 +731,6 @@ class _PaymentModePageState extends State<PaymentModePage> {
         );
       }).toList();
 
-      // Define se é para viagem ou não no model da venda (se houver campo)
-      // Como não posso alterar o modelo Venda aqui, assumiremos que o PrinterService
-      // receberá o parâmetro extra.
-
       final venda = Venda(
         codigo: 0,
         data: now,
@@ -779,16 +769,41 @@ class _PaymentModePageState extends State<PaymentModePage> {
               final success = await comandaController.inserirVenda(vendaData);
 
               if (success['codigo'] != 0) {
+                // --- NOVA LÓGICA: FECHAR MESA E COMANDA NA API ---
+                if (widget.mesaId != null) {
+                  final cService = ComandaService();
+                  try {
+                    // 1. Busca a comanda para obter o ID real dela para dar baixa na Data/Hora
+                    final comandaDb =
+                        await cService.fetchComanda(widget.mesaId!);
+
+                    if (comandaDb.codigo != null && comandaDb.codigo! > 0) {
+                      String dataStr =
+                          DateFormat('yyyy-MM-dd').format(DateTime.now());
+                      String horaStr =
+                          DateFormat('HH:mm:ss').format(DateTime.now());
+
+                      // Dá baixa com data e hora
+                      await cService.fecharComanda(
+                          comandaDb.codigo!, dataStr, horaStr);
+                    }
+
+                    // 2. Encerra a mesa na rota dedicada para isso
+                    await cService.encerrarComanda(widget.mesaId!);
+                  } catch (e) {
+                    print("Erro ao encerrar mesa/comanda na finalização: $e");
+                  }
+                }
+                // --------------------------------------------------
+
                 int numeroPedido =
                     await OrderNumberService.generateNextOrderNumber();
 
-                // AQUI PASSAMOS O FLAG "PARA LEVAR"
-                await PrinterService.printOrder(
+                /*await PrinterService.printOrder(
                     itens: itens,
                     orderNumber: numeroPedido,
                     totalValue: valorComanda,
-                    isParaLevar: _isParaLevar // <--- Parâmetro Novo
-                    );
+                    isParaLevar: _isParaLevar);
 
                 if (mounted) {
                   await Navigator.of(context).pushAndRemoveUntil(
@@ -797,9 +812,10 @@ class _PaymentModePageState extends State<PaymentModePage> {
                             itens: itens,
                             numeroPedido: numeroPedido,
                             totalValue: valorComanda)),
-                    (route) => true,
+                    (route) => false,
                   );
                 }
+                */
                 comandaController.clear();
               }
             },
@@ -812,7 +828,17 @@ class _PaymentModePageState extends State<PaymentModePage> {
   }
 
   void navegarParaTelaAnterior() {
-    Get.offAndToNamed('/principal');
+    bool usarMesas = ConfigController.instance.useTables.value;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrincipalPage(
+          paginas: usarMesas ? Paginas.mesas : Paginas.categorias,
+        ),
+      ),
+      (route) => false,
+    );
   }
 
   int _getFormaPagtoId(String formaPagto) {

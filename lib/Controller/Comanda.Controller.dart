@@ -58,14 +58,19 @@ class ComandaController extends ChangeNotifier {
   int get totalItens => itens.length;
   bool get isEmpty => itens.isEmpty;
 
+  // --- NOVA FUNÇÃO ---
+  // Carrega itens vindos do banco de dados para a comanda local
+  void carregarItensDaComanda(List<Itens> itensDoBanco) {
+    itens.clear();
+    itens.addAll(itensDoBanco);
+    notifyListeners();
+  }
+
   // MODIFICADO: Adiciona sempre uma NOVA LINHA, sem somar quantidade
   void adicionaItem(Produtos produto, String idAgrupamento,
       {GradeProduto? gradeProduto,
       double quantidade = 1.0,
       required int usuario}) {
-    // Removida a lógica de "indexWhere" que buscava item existente.
-    // Agora sempre adiciona um novo item na lista.
-
     itens.add(
       Itens(
         // Gera um código único baseado no timestamp para garantir unicidade na lista
@@ -96,7 +101,6 @@ class ComandaController extends ChangeNotifier {
 
   // Remove todas as ocorrências de um produto (usado pelos botões de - no catálogo)
   void removeItem(int? codProduto) {
-    // Remove a última ocorrência encontrada para dar sensação de "desempilhar" visualmente
     var index = itens.lastIndexWhere((e) => e.produto == codProduto);
     if (index != -1) {
       itens.removeAt(index);
@@ -104,15 +108,13 @@ class ComandaController extends ChangeNotifier {
     }
   }
 
-  // MODIFICADO: Remove a linha específica clicada no carrinho
+  // Remove a linha específica clicada no carrinho
   void removeItemCarrinho(Itens item) {
-    // Remove pela referência do objeto, garantindo que apague apenas a linha clicada
     itens.remove(item);
     notifyListeners();
   }
 
   void diminuirQuantidade(int? codigo) {
-    // Encontra o último item adicionado desse produto
     var index = itens.lastIndexWhere((e) => e.produto == codigo);
 
     if (index != -1) {
@@ -120,7 +122,6 @@ class ComandaController extends ChangeNotifier {
       if ((item.quantidade ?? 0) > 1) {
         item.quantidade = item.quantidade! - 1.0;
       } else {
-        // Se a quantidade for 1, remove a linha
         itens.removeAt(index);
       }
     }
@@ -153,7 +154,6 @@ class ComandaController extends ChangeNotifier {
   }
 
   void adicionaObservacao(int? codItem, String obs) {
-    // Busca pelo código único gerado no adicionaItem
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
       itens[indice].obs = obs;
@@ -162,7 +162,6 @@ class ComandaController extends ChangeNotifier {
   }
 
   void adicionaComplementos(int? codItem, List<Complementos> complementos) {
-    // Busca pelo código único gerado no adicionaItem
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
       itens[indice].complementos = List.from(complementos);
@@ -171,7 +170,6 @@ class ComandaController extends ChangeNotifier {
   }
 
   void adicionaOpcoesNivel(int? codItem, List<OpcaoNivel> opcoes) {
-    // Busca pelo código único gerado no adicionaItem
     var indice = itens.indexWhere((element) => element.codigo == codItem);
     if (indice != -1) {
       itens[indice].opcoesNiveis = List.from(opcoes);
