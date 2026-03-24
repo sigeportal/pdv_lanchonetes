@@ -11,7 +11,6 @@ import 'package:flutter/cupertino.dart';
 class ComandaController extends ChangeNotifier {
   List<Itens> itens = [];
 
-  // Cálculo do total
   double get valorComanda {
     double somaTotal = 0.0;
 
@@ -22,7 +21,7 @@ class ComandaController extends ChangeNotifier {
       if (item.complementos != null && item.complementos!.isNotEmpty) {
         for (var comp in item.complementos!) {
           double valComp = (comp.valor).toDouble();
-          double qtdComp = (comp.quantidade ?? 0).toDouble();
+          double qtdComp = (comp.quantidade ?? 1).toDouble();
           valorAdicionais += (valComp * qtdComp);
         }
       }
@@ -30,21 +29,21 @@ class ComandaController extends ChangeNotifier {
       if (item.opcoesNiveis != null && item.opcoesNiveis!.isNotEmpty) {
         for (var op in item.opcoesNiveis!) {
           double valOp = (op.valorAdicional).toDouble();
-          double qtdOp = (op.quantidade ?? 0).toDouble();
+          double qtdOp = (op.quantidade ?? 1).toDouble();
           valorAdicionais += (valOp * qtdOp);
         }
       }
 
       double quantidadeItem = (item.quantidade ?? 1.0).toDouble();
-      double valorUnitarioCheio = valorItemBase + valorAdicionais;
+      if (quantidadeItem == 0) quantidadeItem = 1.0;
 
+      double valorUnitarioCheio = valorItemBase + valorAdicionais;
       somaTotal += (valorUnitarioCheio * quantidadeItem);
     }
 
     return somaTotal;
   }
 
-  // Retorna a quantidade total de um produto específico (para mostrar no badge do grid)
   double getQuantidade(int produto) {
     double quantidade = 0;
     for (var element in itens) {
@@ -58,22 +57,19 @@ class ComandaController extends ChangeNotifier {
   int get totalItens => itens.length;
   bool get isEmpty => itens.isEmpty;
 
-  // --- NOVA FUNÇÃO ---
-  // Carrega itens vindos do banco de dados para a comanda local
   void carregarItensDaComanda(List<Itens> itensDoBanco) {
     itens.clear();
     itens.addAll(itensDoBanco);
     notifyListeners();
   }
 
-  // MODIFICADO: Adiciona sempre uma NOVA LINHA, sem somar quantidade
   void adicionaItem(Produtos produto, String idAgrupamento,
       {GradeProduto? gradeProduto,
       double quantidade = 1.0,
       required int usuario}) {
     itens.add(
       Itens(
-        // Gera um código único baseado no timestamp para garantir unicidade na lista
+        // Os itens locais recebem um código gigante baseado na data/hora
         codigo: DateTime.now().millisecondsSinceEpoch,
         produto: produto.codigo,
         quantidade: quantidade,
@@ -99,7 +95,6 @@ class ComandaController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Remove todas as ocorrências de um produto (usado pelos botões de - no catálogo)
   void removeItem(int? codProduto) {
     var index = itens.lastIndexWhere((e) => e.produto == codProduto);
     if (index != -1) {
@@ -108,7 +103,6 @@ class ComandaController extends ChangeNotifier {
     }
   }
 
-  // Remove a linha específica clicada no carrinho
   void removeItemCarrinho(Itens item) {
     itens.remove(item);
     notifyListeners();
@@ -128,24 +122,38 @@ class ComandaController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // --- FUNÇÃO CORRIGIDA PARA ENVIAR APENAS ITENS NOVOS ---
   Future<bool> insereComanda(int? mesa) async {
     final comandaService = ComandaService();
     var resultado = false;
     try {
+      // 1. Busca como a comanda está lá no banco atualmente
+      var comandaExistente = await comandaService.fetchComanda(mesa);
+
       var comanda = Comanda();
       comanda.mesa = mesa;
-      comanda.valor = valorComanda;
-      comanda.itens = [...itens];
+      comanda.valor = valorComanda; // Envia o valor atualizado e recalculado
 
-      var comandaExistente = await comandaService.fetchComanda(mesa);
       if (comandaExistente.itens == null || comandaExistente.itens!.isEmpty) {
+        // Se o banco retornou vazio, é uma COMANDA NOVA, envia tudo.
+        comanda.itens = [...itens];
         resultado = await comandaService.criaComanda(comanda);
       } else {
+        // Se a comanda JÁ EXISTE, filtramos a lista.
+        // O segredo: Se o código do item local NÃO existir na lista do banco, é porque ele é NOVO.
+        List<Itens> itensNovos = itens.where((itemLocal) {
+          return !comandaExistente.itens!
+              .any((itemBanco) => itemBanco.codigo == itemLocal.codigo);
+        }).toList();
+
+        // Envia apenas o delta (o que for novo) para o PUT
+        comanda.itens = itensNovos;
+
         resultado = await comandaService.atualizarComanda(comanda);
       }
 
       if (resultado) {
-        clear();
+        clear(); // Limpa o carrinho após enviar para a cozinha
       }
       return resultado;
     } catch (e) {
@@ -181,7 +189,6 @@ class ComandaController extends ChangeNotifier {
     final comandaService = ComandaService();
     try {
       final result = await comandaService.deletarItemComanda(codigo);
-      notifyListeners();
       return result;
     } catch (e) {
       throw Exception(e);
@@ -192,7 +199,6 @@ class ComandaController extends ChangeNotifier {
     final comandaService = ComandaService();
     try {
       final result = await comandaService.fetchComanda(codigo);
-      notifyListeners();
       return result;
     } catch (e) {
       throw Exception(e);

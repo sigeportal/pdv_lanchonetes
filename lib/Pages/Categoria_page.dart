@@ -18,7 +18,6 @@ import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
 import 'package:lanchonete/Services/MesaService.dart';
 
-// --- IMPORT DA TELA DE PAGAMENTO ADICIONADO ---
 import 'package:lanchonete/Pages/Payment_mode_page.dart';
 
 class CategoriaPage extends StatefulWidget {
@@ -237,7 +236,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
-  // --- ALTERAÇÃO AQUI: Passando o mesaId diretamente ---
   Future<void> _irParaPagamento(ComandaController controller) async {
     String? erroValidacao = _validarItensComValorZerado(controller.itens);
     if (erroValidacao != null) {
@@ -250,8 +248,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       MaterialPageRoute(
         builder: (_) => PaymentModePage(
           valorPagamento: controller.valorComanda,
-          mesaId: widget
-              .mesaId, // Repassa a mesa atual para que o pagamento feche ela
+          mesaId: widget.mesaId,
         ),
       ),
     );
@@ -343,14 +340,32 @@ class _CategoriaPageState extends State<CategoriaPage> {
         false;
   }
 
+  Future<void> _removerItem(Itens item, ComandaController controller) async {
+    controller.removeItemCarrinho(item);
+
+    if (item.codigo != null && item.codigo! < 1000000000000) {
+      try {
+        await controller.deletarItemComanda(item.codigo!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Item removido do sistema.'),
+              backgroundColor: Colors.orange),
+        );
+      } catch (e) {
+        print("Falha ao deletar no servidor: $e");
+      }
+    }
+  }
+
   List<Map<String, dynamic>> _getExtrasOrdenados(Itens item) {
     List<Map<String, dynamic>> extras = [];
+
     if (item.complementos != null) {
       for (var c in item.complementos!) {
         extras.add({
           'nome': c.nome,
           'qtd': c.quantidade,
-          'valor': c.valor * c.quantidade,
+          'valor': c.valor * (c.quantidade == 0 ? 1 : c.quantidade),
           'tipo': 'complemento'
         });
       }
@@ -360,7 +375,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
         extras.add({
           'nome': op.nome,
           'qtd': op.quantidade,
-          'valor': op.valorAdicional * op.quantidade,
+          'valor': op.valorAdicional * (op.quantidade == 0 ? 1 : op.quantidade),
           'tipo': 'opcao'
         });
       }
@@ -406,6 +421,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       if (!aPri && bPri) return 1;
       return 0;
     });
+
     return extras;
   }
 
@@ -535,7 +551,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       confirmDismiss: (direction) async {
         return await _confirmarExclusao(context);
       },
-      onDismissed: (_) => controller.removeItemCarrinho(item),
+      onDismissed: (_) => _removerItem(item, controller),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -587,7 +603,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                       onPressed: () async {
                         bool confirmar = await _confirmarExclusao(context);
                         if (confirmar) {
-                          controller.removeItemCarrinho(item);
+                          _removerItem(item, controller);
                         }
                       },
                     ),
@@ -671,6 +687,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
         double totalItens = controller.itens
             .fold(0, (sum, item) => sum + (item.quantidade ?? 0));
 
+        bool usarMesas = ConfigController.instance.useTables.value;
         bool mesaOcupada = widget.estadoMesa == 'O';
 
         return Container(
@@ -761,38 +778,67 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         const SizedBox(height: 15),
                         Row(
                           children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 45,
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent[700],
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8))),
-                                  onPressed:
-                                      (controller.isEmpty || _isEnviandoPedido)
-                                          ? null
-                                          : () => _realizarPedido(controller),
-                                  icon: _isEnviandoPedido
-                                      ? const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2))
-                                      : const Icon(Icons.send_rounded,
-                                          size: 18),
-                                  label: const Text("FAZER PEDIDO",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13)),
+                            // --- ALTERAÇÃO AQUI: CONTROLE INTELIGENTE DE BOTÕES ---
+                            if (usarMesas) ...[
+                              // Botão FAZER PEDIDO (Aparece apenas quando está usando Mesas)
+                              Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent[700],
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8))),
+                                    onPressed: (controller.isEmpty ||
+                                            _isEnviandoPedido)
+                                        ? null
+                                        : () => _realizarPedido(controller),
+                                    icon: _isEnviandoPedido
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2))
+                                        : const Icon(Icons.send_rounded,
+                                            size: 18),
+                                    label: const Text("FAZER PEDIDO",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13)),
+                                  ),
                                 ),
                               ),
-                            ),
-                            if (mesaOcupada) ...[
-                              const SizedBox(width: 10),
+                              if (mesaOcupada) ...[
+                                const SizedBox(width: 10),
+                                // Botão PAGAR (Aparece se a mesa for Ocupada)
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 45,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green[600],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8))),
+                                      onPressed: controller.isEmpty
+                                          ? null
+                                          : () => _irParaPagamento(controller),
+                                      icon: const Icon(Icons.monetization_on,
+                                          size: 18),
+                                      label: const Text("PAGAR",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13)),
+                                    ),
+                                  ),
+                                ),
+                              ]
+                            ] else ...[
+                              // Botão ÚNICO DE PAGAMENTO (Quando uso de Mesas estiver DESATIVADO)
                               Expanded(
                                 child: SizedBox(
                                   height: 45,
@@ -808,7 +854,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                         : () => _irParaPagamento(controller),
                                     icon: const Icon(Icons.monetization_on,
                                         size: 18),
-                                    label: const Text("PAGAR",
+                                    label: const Text("IR PARA PAGAMENTO",
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 13)),

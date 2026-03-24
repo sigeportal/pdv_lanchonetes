@@ -60,10 +60,15 @@ class ComandaService {
     try {
       final response = await dio.get('/v1/comandas/$codigo');
 
-      print(response.data);
-
       if (response.statusCode == 200 && response.data != null) {
-        resultado = Comanda.fromJson(response.data);
+        var jsonData = response.data;
+
+        if (jsonData is Map<String, dynamic> &&
+            jsonData.containsKey('comanda')) {
+          jsonData = jsonData['comanda'];
+        }
+
+        resultado = Comanda.fromJson(jsonData);
       }
     } catch (e) {
       print('Erro ao consultar a comanda (fetchComanda): $e');
@@ -71,7 +76,6 @@ class ComandaService {
     return resultado;
   }
 
-  // Encerra Mesa e Comanda simultaneamente pela rota específica
   Future<bool> encerrarComanda(int? codigoMesa) async {
     final url = await ConfigController.instance.getUrlBase();
     BaseOptions options = BaseOptions(
@@ -90,7 +94,6 @@ class ComandaService {
     }
   }
 
-  // --- NOVA FUNÇÃO: FECHAR COMANDA COM DATA E HORA ---
   Future<bool> fecharComanda(
       int codigoComanda, String dataFechamento, String horaFechamento) async {
     final url = await ConfigController.instance.getUrlBase();
@@ -125,8 +128,6 @@ class ComandaService {
     try {
       final response =
           await dio.put('/v1/comandas/${comanda.mesa}', data: comanda.toJson());
-
-      print(comanda.toJson());
       return response.statusCode == 200;
     } catch (e) {
       print('Erro ao atualizar comanda: $e');
