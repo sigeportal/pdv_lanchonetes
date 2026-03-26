@@ -11,7 +11,7 @@ Future<List<Categoria>> fetchCategorias() async {
   );
 
   Dio dio = new Dio(options);
-  final response = await dio.get<List>('/Categorias');
+  final response = await dio.get<List>('/v1/categorias');
   final resultado =
       response.data!.map((json) => Categoria.fromJson(json)).toList();
   return resultado;
@@ -26,7 +26,7 @@ Future<String?> fetchFotoCategoria(int? codigo) async {
   );
 
   Dio dio = new Dio(options);
-  final response = await dio.get('/Categorias/$codigo/foto');
+  final response = await dio.get('/v1/categorias/$codigo/foto');
   final resultado = Map<String, dynamic>.from(response.data);
   return resultado['base64'];
 }

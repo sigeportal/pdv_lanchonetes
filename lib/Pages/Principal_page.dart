@@ -1,11 +1,13 @@
 import 'package:lanchonete/Constants.dart';
+import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Config_page.dart';
 import 'package:lanchonete/Pages/Consulta_Produtos_page.dart';
 import 'package:lanchonete/Pages/PrintersConfigPage.dart';
+import 'package:lanchonete/Pages/Mesas_page.dart';
 import 'package:flutter/material.dart';
 
-enum Paginas { categorias, consultaProdutos, configuracao, impressoras }
+enum Paginas { mesas, categorias, consultaProdutos, configuracao, impressoras }
 
 class PrincipalPage extends StatefulWidget {
   final Paginas paginas;
@@ -18,23 +20,30 @@ class PrincipalPage extends StatefulWidget {
 
 class _PrincipalPageState extends State<PrincipalPage> {
   late int _selectedIndex;
+  int? _mesaSelecionada;
+  String? _estadoMesaSelecionada;
+  bool _useTables = false;
 
-  // Chave global para controlar o Scaffold (Menu Lateral)
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
-    // Inicializa o índice com base no parâmetro passado
+    _useTables = ConfigController.instance.useTables.value;
     _selectedIndex = widget.paginas.index;
+
+    // --- ESCUDO DE ROTA (A MÁGICA ACONTECE AQUI) ---
+    // Impede que telas de carregamento ou rotas antigas forcem a abertura
+    // da CategoriaPage quando o uso de mesas está ativado e nenhuma mesa foi selecionada.
+    if (_useTables &&
+        _selectedIndex == Paginas.categorias.index &&
+        _mesaSelecionada == null) {
+      _selectedIndex = Paginas.mesas.index;
+    }
   }
 
-  // Função segura para abrir o Drawer
   void _openDrawer() {
-    // Garante que o teclado seja fechado antes de abrir o menu
     FocusScope.of(context).unfocus();
-
-    // Pequeno delay para garantir que o teclado sumiu e o estado está montado
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scaffoldKey.currentState != null) {
         _scaffoldKey.currentState!.openDrawer();
@@ -44,21 +53,41 @@ class _PrincipalPageState extends State<PrincipalPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Recriamos a lista no build para garantir que os callbacks estejam sempre atualizados
     final List<Widget> _paginas = <Widget>[
-      // AQUI ESTÁ O SEGREDO: Passamos a função _openDrawer atualizada
-      CategoriaPage(onOpenDrawer: _openDrawer),
+      MesasPage(
+        onOpenDrawer: _openDrawer,
+        onMesaSelected: (mesaId, estado) {
+          setState(() {
+            _mesaSelecionada = mesaId;
+            _estadoMesaSelecionada = estado;
+            _selectedIndex = Paginas.categorias.index;
+          });
+        },
+      ),
+      CategoriaPage(
+        onOpenDrawer: _openDrawer,
+        mesaId: _mesaSelecionada,
+        estadoMesa: _estadoMesaSelecionada,
+        onVoltarMesas: () {
+          setState(() {
+            _mesaSelecionada = null;
+            _estadoMesaSelecionada = null;
+            _selectedIndex = Paginas.mesas.index;
+          });
+        },
+      ),
       ConsultaProdutosPage(),
       ConfigPage(),
       PrinterConfigPage()
     ];
 
-    bool isCategoriaPage = _selectedIndex == 0;
+    bool isCustomAppBarPage = _selectedIndex == Paginas.categorias.index ||
+        _selectedIndex == Paginas.mesas.index;
 
     return Scaffold(
-      key: _scaffoldKey, // Vincula a chave ao Scaffold
-      appBar: isCategoriaPage
-          ? null // CategoriaPage tem sua própria AppBar
+      key: _scaffoldKey,
+      appBar: isCustomAppBarPage
+          ? null
           : AppBar(
               title: Text(
                 _titulos[_selectedIndex],
@@ -91,30 +120,49 @@ class _PrincipalPageState extends State<PrincipalPage> {
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
+                  if (_useTables)
+                    _buildDrawerItem(
+                      icon: Icons.table_restaurant_rounded,
+                      text: 'Gerenciar Mesas',
+                      isSelected: _selectedIndex == Paginas.mesas.index,
+                      onTap: () => _onItemTapped(Paginas.mesas.index),
+                    ),
                   _buildDrawerItem(
                     icon: Icons.point_of_sale_rounded,
-                    text: 'Realizar Venda',
-                    isSelected: _selectedIndex == 0,
-                    onTap: () => _onItemTapped(0),
+                    text: _useTables ? 'Venda Atual (Mesa)' : 'Realizar Venda',
+                    isSelected: _selectedIndex == Paginas.categorias.index,
+                    onTap: () {
+                      if (_useTables && _mesaSelecionada == null) {
+                        _onItemTapped(Paginas.mesas.index);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'Por favor, selecione uma mesa primeiro.')),
+                        );
+                      } else {
+                        _onItemTapped(Paginas.categorias.index);
+                      }
+                    },
                   ),
                   _buildDrawerItem(
                     icon: Icons.price_check_rounded,
                     text: 'Consultar Preço',
-                    isSelected: _selectedIndex == 1,
-                    onTap: () => _onItemTapped(1),
+                    isSelected:
+                        _selectedIndex == Paginas.consultaProdutos.index,
+                    onTap: () => _onItemTapped(Paginas.consultaProdutos.index),
                   ),
                   const Divider(),
                   _buildDrawerItem(
                     icon: Icons.settings_rounded,
                     text: 'Configurações',
-                    isSelected: _selectedIndex == 2,
-                    onTap: () => _onItemTapped(2),
+                    isSelected: _selectedIndex == Paginas.configuracao.index,
+                    onTap: () => _onItemTapped(Paginas.configuracao.index),
                   ),
                   _buildDrawerItem(
                     icon: Icons.print_rounded,
                     text: 'Impressoras',
-                    isSelected: _selectedIndex == 3,
-                    onTap: () => _onItemTapped(3),
+                    isSelected: _selectedIndex == Paginas.impressoras.index,
+                    onTap: () => _onItemTapped(Paginas.impressoras.index),
                   ),
                 ],
               ),
@@ -133,8 +181,8 @@ class _PrincipalPageState extends State<PrincipalPage> {
     );
   }
 
-  // Lista de Títulos
   final List<String> _titulos = [
+    'Mesas',
     'Vendas',
     'Consultar Preço',
     'Configurações',
@@ -175,7 +223,6 @@ class _PrincipalPageState extends State<PrincipalPage> {
     setState(() {
       _selectedIndex = index;
     });
-    // Fecha o Drawer ao selecionar
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }

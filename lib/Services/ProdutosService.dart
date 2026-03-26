@@ -21,9 +21,9 @@ class ProdutosService {
 
       dio = new Dio(options);
       if (filtro != '') {
-        url = '/Produtos$filtro';
+        url = '/v1/produtos$filtro';
       } else {
-        url = '/Produtos';
+        url = '/v1/produtos';
       }
       final response = await dio.get<List>(url);
       final resultado =
@@ -44,7 +44,7 @@ class ProdutosService {
 
     dio = new Dio(options);
     try {
-      final response = await dio.get('/Produtos/$codigo');
+      final response = await dio.get('/v1/produtos/$codigo');
       return Produtos.fromJson(response.data);
     } catch (e) {
       throw Exception(e);
@@ -54,7 +54,7 @@ class ProdutosService {
   Future<String?> fetchFotoProduto(int? codigo) async {
     String url = '';
     try {
-      url = '/Produtos/$codigo/foto';
+      url = '/v1/produtos/$codigo/foto';
       final baseurl = await ConfigController.instance.getUrlBase();
       BaseOptions options = new BaseOptions(
         baseUrl: baseurl,
@@ -74,7 +74,7 @@ class ProdutosService {
   Future<List<GradeProduto>> fetchGradesProduto(int codigo) async {
     String url = '';
     try {
-      url = '/Produtos/Grades/$codigo';
+      url = '/v1/produtos/grades/$codigo';
       final baseurl = await ConfigController.instance.getUrlBase();
       BaseOptions options = new BaseOptions(
         baseUrl: baseurl,
@@ -94,7 +94,7 @@ class ProdutosService {
   Future<GradeProduto> fetchGradeProduto(int codProduto, String tamanho) async {
     String url = '';
     try {
-      url = '/Produtos/Grades/$codProduto/$tamanho';
+      url = '/v1/produtos/grades/$codProduto/$tamanho';
       final baseurl = await ConfigController.instance.getUrlBase();
       BaseOptions options = new BaseOptions(
         baseUrl: baseurl,
@@ -113,7 +113,7 @@ class ProdutosService {
   Future<List<Nivel>> getNiveis(int codProduto) async {
     String url = '';
     try {
-      url = '/Produtos/$codProduto/niveis';
+      url = '/v1/produtos/$codProduto/niveis';
       final baseurl = await ConfigController.instance.getUrlBase();
       BaseOptions options = new BaseOptions(
         baseUrl: baseurl,

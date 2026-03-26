@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -11,12 +12,27 @@ import 'package:lanchonete/Models/produtos_model.dart';
 import 'package:lanchonete/Models/categoria_model.dart';
 import 'package:lanchonete/Models/itens_model.dart';
 import 'package:lanchonete/Models/niveis_model.dart';
+import 'package:lanchonete/Models/comanda_model.dart';
+import 'package:lanchonete/Models/mesa_model.dart';
 import 'package:lanchonete/Services/ProdutosService.dart';
 import 'package:lanchonete/Services/CategoriaService.dart';
+import 'package:lanchonete/Services/MesaService.dart';
+
+import 'package:lanchonete/Pages/Payment_mode_page.dart';
 
 class CategoriaPage extends StatefulWidget {
   final VoidCallback? onOpenDrawer;
-  const CategoriaPage({Key? key, this.onOpenDrawer}) : super(key: key);
+  final VoidCallback? onVoltarMesas;
+  final int? mesaId;
+  final String? estadoMesa;
+
+  const CategoriaPage(
+      {Key? key,
+      this.onOpenDrawer,
+      this.onVoltarMesas,
+      this.mesaId,
+      this.estadoMesa})
+      : super(key: key);
 
   @override
   _CategoriaPageState createState() => _CategoriaPageState();
@@ -24,6 +40,7 @@ class CategoriaPage extends StatefulWidget {
 
 class _CategoriaPageState extends State<CategoriaPage> {
   final _serviceProdutos = ProdutosService();
+  final _mesaService = MesaService();
   final _formatMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
   List<Categoria> _categorias = [];
@@ -32,6 +49,8 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
   bool _isLoadingProdutos = false;
   bool _isLoadingCategorias = true;
+  bool _isEnviandoPedido = false;
+  bool _isConsultandoComanda = false;
   String? _erroMensagem;
 
   final ScrollController _produtosScrollController = ScrollController();
@@ -43,6 +62,12 @@ class _CategoriaPageState extends State<CategoriaPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _carregarDadosIniciais();
+
+      if (widget.estadoMesa == 'O') {
+        _consultarComandaDaMesa();
+      } else {
+        Provider.of<ComandaController>(context, listen: false).clear();
+      }
     });
   }
 
@@ -52,6 +77,36 @@ class _CategoriaPageState extends State<CategoriaPage> {
     _comandaScrollController.dispose();
     _categoriasScrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _consultarComandaDaMesa() async {
+    if (widget.mesaId == null) return;
+
+    setState(() => _isConsultandoComanda = true);
+    final controller = Provider.of<ComandaController>(context, listen: false);
+
+    try {
+      Comanda comandaExistente = await controller.buscaComanda(widget.mesaId!);
+
+      if (comandaExistente.itens != null &&
+          comandaExistente.itens!.isNotEmpty) {
+        controller.carregarItensDaComanda(comandaExistente.itens!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Itens da comanda carregados com sucesso!'),
+              backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      print("Erro ao consultar comanda existente: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Falha ao sincronizar a comanda.'),
+            backgroundColor: Colors.orange),
+      );
+    } finally {
+      if (mounted) setState(() => _isConsultandoComanda = false);
+    }
   }
 
   Future<void> _carregarDadosIniciais() async {
@@ -115,7 +170,90 @@ class _CategoriaPageState extends State<CategoriaPage> {
     }
   }
 
-  // Validação de Preço Zerado
+  Future<void> _realizarPedido(ComandaController controller) async {
+    String? erroValidacao = _validarItensComValorZerado(controller.itens);
+    if (erroValidacao != null) {
+      await _exibirAvisoValorZerado(erroValidacao);
+      return;
+    }
+
+    setState(() {
+      _isEnviandoPedido = true;
+    });
+
+    try {
+      bool usarMesas = ConfigController.instance.useTables.value;
+      int? mesaDoPedido = usarMesas ? widget.mesaId : null;
+
+      if (usarMesas && mesaDoPedido != null) {
+        Mesa novaMesa = Mesa(
+          codigo: mesaDoPedido,
+          nome: "Mesa ${mesaDoPedido.toString().padLeft(2, '0')}",
+          estado: 'O',
+        );
+
+        bool mesaSalva = await _mesaService.salvarMesa(novaMesa);
+        if (!mesaSalva) {
+          print(
+              "Aviso: Falha ao garantir a criação/atualização da mesa no banco.");
+        }
+      }
+
+      bool sucesso = await controller.insereComanda(mesaDoPedido);
+
+      if (sucesso) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pedido enviado para a cozinha com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        if (mounted && usarMesas && widget.onVoltarMesas != null) {
+          widget.onVoltarMesas!();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao enviar pedido para o servidor.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao realizar pedido: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isEnviandoPedido = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _irParaPagamento(ComandaController controller) async {
+    String? erroValidacao = _validarItensComValorZerado(controller.itens);
+    if (erroValidacao != null) {
+      await _exibirAvisoValorZerado(erroValidacao);
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentModePage(
+          valorPagamento: controller.valorComanda,
+          mesaId: widget.mesaId,
+        ),
+      ),
+    );
+  }
+
   String? _validarItensComValorZerado(List<Itens> itens) {
     for (var item in itens) {
       double valorBaseUnitario = item.valor ?? 0;
@@ -202,63 +340,86 @@ class _CategoriaPageState extends State<CategoriaPage> {
         false;
   }
 
-  // --- LÓGICA DE ORDENAÇÃO DE EXTRAS (Tamanho/Unidade Primeiro) ---
+  Future<void> _removerItem(Itens item, ComandaController controller) async {
+    controller.removeItemCarrinho(item);
+
+    if (item.codigo != null && item.codigo! < 1000000000000) {
+      try {
+        await controller.deletarItemComanda(item.codigo!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Item removido do sistema.'),
+              backgroundColor: Colors.orange),
+        );
+      } catch (e) {
+        print("Falha ao deletar no servidor: $e");
+      }
+    }
+  }
+
   List<Map<String, dynamic>> _getExtrasOrdenados(Itens item) {
     List<Map<String, dynamic>> extras = [];
 
-    // Adiciona Complementos
     if (item.complementos != null) {
       for (var c in item.complementos!) {
         extras.add({
           'nome': c.nome,
           'qtd': c.quantidade,
-          'valor': c.valor * c.quantidade,
+          'valor': c.valor * (c.quantidade == 0 ? 1 : c.quantidade),
           'tipo': 'complemento'
         });
       }
     }
-
-    // Adiciona Opções de Nível
     if (item.opcoesNiveis != null) {
       for (var op in item.opcoesNiveis!) {
         extras.add({
           'nome': op.nome,
           'qtd': op.quantidade,
-          'valor': op.valorAdicional * op.quantidade,
+          'valor': op.valorAdicional * (op.quantidade == 0 ? 1 : op.quantidade),
           'tipo': 'opcao'
         });
       }
     }
-
-    // Palavras-chave que indicam prioridade
     final prioridades = [
-      'TAMANHO', 'TAM', 'UNIDADE', 'UN', 'UNID',
-      'PEQUENO', 'MEDIO', 'MÉDIO', 'GRANDE', 'GIGANTE', 'FAMILIA',
-      ' P ', ' M ', ' G ', ' GG ', // Espaços para evitar falsos positivos
-      '(P)', '(M)', '(G)', '(GG)',
-      ' P', ' M', ' G', ' GG' // Fim de frase
+      'TAMANHO',
+      'TAM',
+      'UNIDADE',
+      'UN',
+      'UNID',
+      'PEQUENO',
+      'MEDIO',
+      'MÉDIO',
+      'GRANDE',
+      'GIGANTE',
+      'FAMILIA',
+      ' P ',
+      ' M ',
+      ' G ',
+      ' GG ',
+      '(P)',
+      '(M)',
+      '(G)',
+      '(GG)',
+      ' P',
+      ' M',
+      ' G',
+      ' GG'
     ];
-
     bool isPrioridade(String nome) {
       String n = nome.toUpperCase();
-      // Verifica igualdade exata para letras soltas
       if (['P', 'M', 'G', 'GG'].contains(n.trim())) return true;
-
-      // Verifica conter palavras-chave
       for (var p in prioridades) {
         if (n.contains(p)) return true;
       }
       return false;
     }
 
-    // Ordena: Prioritários primeiro, o resto mantém a ordem de inserção
     extras.sort((a, b) {
       bool aPri = isPrioridade(a['nome'] ?? '');
       bool bPri = isPrioridade(b['nome'] ?? '');
-
-      if (aPri && !bPri) return -1; // A vem primeiro
-      if (!aPri && bPri) return 1; // B vem primeiro
-      return 0; // Mantém ordem original
+      if (aPri && !bPri) return -1;
+      if (!aPri && bPri) return 1;
+      return 0;
     });
 
     return extras;
@@ -363,7 +524,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     double valorBaseUnitario = item.valor ?? 0;
     double valorAdicionaisUnitario = 0;
 
-    // Calcula valor para lógica de preço (mantido original)
     if (item.complementos != null) {
       for (var comp in item.complementos!) {
         valorAdicionaisUnitario += (comp.valor * comp.quantidade);
@@ -378,7 +538,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
     double valorTotalLinha =
         (valorBaseUnitario + valorAdicionaisUnitario) * (item.quantidade ?? 1);
 
-    // Obtém lista mesclada e ORDENADA (Tamanho primeiro) para exibição
     List<Map<String, dynamic>> extrasExibicao = _getExtrasOrdenados(item);
 
     return Dismissible(
@@ -392,7 +551,7 @@ class _CategoriaPageState extends State<CategoriaPage> {
       confirmDismiss: (direction) async {
         return await _confirmarExclusao(context);
       },
-      onDismissed: (_) => controller.removeItemCarrinho(item),
+      onDismissed: (_) => _removerItem(item, controller),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -424,7 +583,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Título e Botão Remover
                 Row(
                   children: [
                     Expanded(
@@ -445,14 +603,12 @@ class _CategoriaPageState extends State<CategoriaPage> {
                       onPressed: () async {
                         bool confirmar = await _confirmarExclusao(context);
                         if (confirmar) {
-                          controller.removeItemCarrinho(item);
+                          _removerItem(item, controller);
                         }
                       },
                     ),
                   ],
                 ),
-
-                // Preços
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Row(
@@ -468,8 +624,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     ],
                   ),
                 ),
-
-                // LISTA DE EXTRAS UNIFICADA E ORDENADA
                 if (extrasExibicao.isNotEmpty)
                   Container(
                     margin: const EdgeInsets.only(top: 6),
@@ -504,8 +658,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                           .toList(),
                     ),
                   ),
-
-                // Observações
                 if (item.obs != null && item.obs!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -535,6 +687,9 @@ class _CategoriaPageState extends State<CategoriaPage> {
         double totalItens = controller.itens
             .fold(0, (sum, item) => sum + (item.quantidade ?? 0));
 
+        bool usarMesas = ConfigController.instance.useTables.value;
+        bool mesaOcupada = widget.estadoMesa == 'O';
+
         return Container(
           width: 360,
           decoration: BoxDecoration(
@@ -545,7 +700,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
           ),
           child: Column(
             children: [
-              // Cabeçalho da Comanda
               Container(
                 padding: const EdgeInsets.all(16),
                 color: Colors.amber[500],
@@ -576,8 +730,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                   ],
                 ),
               ),
-
-              // Lista de Itens da Comanda
               Expanded(
                 child: controller.isEmpty
                     ? Center(
@@ -599,8 +751,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                         ),
                       ),
               ),
-
-              // Rodapé com Total e Botão
               Container(
                 decoration: BoxDecoration(
                     color: Colors.grey[50],
@@ -625,43 +775,95 @@ class _CategoriaPageState extends State<CategoriaPage> {
                                       fontSize: 22,
                                       fontWeight: FontWeight.bold))
                             ]),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 45,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[600]),
-                            onPressed: controller.isEmpty
-                                ? null
-                                : () async {
-                                    // Validações antes de pagar
-                                    String? erroValidacao =
-                                        _validarItensComValorZerado(
-                                            controller.itens);
-
-                                    if (erroValidacao != null) {
-                                      await _exibirAvisoValorZerado(
-                                          erroValidacao);
-                                      return;
-                                    }
-
-                                    // Navega para Pagamento
-                                    await Navigator.pushNamed(
-                                      context,
-                                      '/payment_mode',
-                                      arguments: {
-                                        'valorPagamento':
-                                            controller.valorComanda,
-                                      },
-                                    );
-                                  },
-                            child: const Text("FINALIZAR",
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        )
+                        const SizedBox(height: 15),
+                        Row(
+                          children: [
+                            // --- ALTERAÇÃO AQUI: CONTROLE INTELIGENTE DE BOTÕES ---
+                            if (usarMesas) ...[
+                              // Botão FAZER PEDIDO (Aparece apenas quando está usando Mesas)
+                              Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.blueAccent[700],
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8))),
+                                    onPressed: (controller.isEmpty ||
+                                            _isEnviandoPedido)
+                                        ? null
+                                        : () => _realizarPedido(controller),
+                                    icon: _isEnviandoPedido
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2))
+                                        : const Icon(Icons.send_rounded,
+                                            size: 18),
+                                    label: const Text("FAZER PEDIDO",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13)),
+                                  ),
+                                ),
+                              ),
+                              if (mesaOcupada) ...[
+                                const SizedBox(width: 10),
+                                // Botão PAGAR (Aparece se a mesa for Ocupada)
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 45,
+                                    child: ElevatedButton.icon(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green[600],
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8))),
+                                      onPressed: controller.isEmpty
+                                          ? null
+                                          : () => _irParaPagamento(controller),
+                                      icon: const Icon(Icons.monetization_on,
+                                          size: 18),
+                                      label: const Text("PAGAR",
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13)),
+                                    ),
+                                  ),
+                                ),
+                              ]
+                            ] else ...[
+                              // Botão ÚNICO DE PAGAMENTO (Quando uso de Mesas estiver DESATIVADO)
+                              Expanded(
+                                child: SizedBox(
+                                  height: 45,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green[600],
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8))),
+                                    onPressed: controller.isEmpty
+                                        ? null
+                                        : () => _irParaPagamento(controller),
+                                    icon: const Icon(Icons.monetization_on,
+                                        size: 18),
+                                    label: const Text("IR PARA PAGAMENTO",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13)),
+                                  ),
+                                ),
+                              ),
+                            ]
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -676,33 +878,65 @@ class _CategoriaPageState extends State<CategoriaPage> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMesaOcupada = widget.estadoMesa == 'O';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.black87),
-          onPressed: () {
-            // Foco: Fecha teclado antes de abrir menu (para tablets)
-            FocusScope.of(context).unfocus();
-
-            if (widget.onOpenDrawer != null) {
-              widget.onOpenDrawer!();
-            } else {
-              try {
-                Scaffold.of(context).openDrawer();
-              } catch (_) {}
-            }
-          },
-        ),
-        title: const Text("PDV / Vendas",
-            style: TextStyle(
+        leading: widget.mesaId != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                tooltip: 'Voltar às Mesas',
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  if (widget.onVoltarMesas != null) {
+                    widget.onVoltarMesas!();
+                  }
+                },
+              )
+            : IconButton(
+                icon: const Icon(Icons.menu, color: Colors.black87),
+                tooltip: 'Menu Principal',
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  if (widget.onOpenDrawer != null) {
+                    widget.onOpenDrawer!();
+                  } else {
+                    try {
+                      Scaffold.of(context).openDrawer();
+                    } catch (_) {}
+                  }
+                },
+              ),
+        title: Text(
+            widget.mesaId != null
+                ? "PDV / Mesa ${widget.mesaId.toString().padLeft(2, '0')}"
+                : "PDV / Vendas",
+            style: const TextStyle(
                 color: Colors.black87,
                 fontWeight: FontWeight.bold,
                 fontSize: 18)),
         centerTitle: true,
         actions: [
+          if (isMesaOcupada)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: TextButton.icon(
+                icon: _isConsultandoComanda
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.receipt_long, color: Colors.blueAccent),
+                label: const Text("Consultar Comanda",
+                    style: TextStyle(
+                        color: Colors.blueAccent, fontWeight: FontWeight.bold)),
+                onPressed:
+                    _isConsultandoComanda ? null : _consultarComandaDaMesa,
+              ),
+            ),
           IconButton(
               icon: const Icon(Icons.refresh, color: Colors.grey),
               onPressed: _carregarDadosIniciais),
@@ -710,7 +944,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
       ),
       body: Column(
         children: [
-          // Categoria Tab - Acima de tudo
           Container(
             height: 65,
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
@@ -730,7 +963,6 @@ class _CategoriaPageState extends State<CategoriaPage> {
                     ),
                   ),
           ),
-          // Conteúdo principal em Row
           Expanded(
             child: Row(
               children: [

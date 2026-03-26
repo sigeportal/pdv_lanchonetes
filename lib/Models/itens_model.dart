@@ -48,49 +48,98 @@ class Itens {
   }
 
   factory Itens.fromJson(Map<String, dynamic> json) {
+    // --- FUNÇÕES DE CONVERSÃO À PROVA DE BALAS ---
+    double parseDoubleSafe(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      if (value is String)
+        return double.tryParse(value.replaceAll(',', '.')) ?? 0.0;
+      return 0.0;
+    }
+
+    int parseIntSafe(dynamic value) {
+      if (value == null) return 0;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    // 1. Processamento Blindado de Niveis/Opcoes
+    List<OpcaoNivel> listaOpcoes = [];
+    var rawOpcoes = json['OpcoesNiveis'] ??
+        json['opcoesNiveis'] ??
+        json['opcoesNivel'] ??
+        [];
+    if (rawOpcoes is List) {
+      for (var e in rawOpcoes) {
+        if (e is Map<String, dynamic>) {
+          Map<String, dynamic> safeMap = Map<String, dynamic>.from(e);
+          // Pega o valor e injeta nas duas chaves possíveis para o seu OpcaoNivel não se perder
+          double val = parseDoubleSafe(e['valor'] ?? e['valorAdicional']);
+          double qtd = parseDoubleSafe(e['quantidade'] ?? 1);
+          safeMap['valor'] = val;
+          safeMap['valorAdicional'] = val;
+          safeMap['quantidade'] = qtd;
+          listaOpcoes.add(OpcaoNivel.fromJson(safeMap));
+        }
+      }
+    }
+
+    // 2. Processamento Blindado de Complementos
+    List<Complementos> listaComplementos = [];
+    var rawComp = json['complementos'] ?? json['Complementos'] ?? [];
+    if (rawComp is List) {
+      for (var c in rawComp) {
+        if (c is Map<String, dynamic>) {
+          Map<String, dynamic> safeMap = Map<String, dynamic>.from(c);
+          safeMap['valor'] = parseDoubleSafe(c['valor']);
+          safeMap['quantidade'] = parseDoubleSafe(c['quantidade'] ?? 1);
+          listaComplementos.add(Complementos.fromJson(safeMap));
+        }
+      }
+    }
+
     return Itens(
-      codigo: json['cpCodigo'] ?? 0,
-      produto: json['cpPro'] ?? 0,
-      estado: json['cpEstado'] ?? '',
-      valor: json['cpValor'] * 100 / 100 ?? 0,
-      quantidade: json['cpQuantidade'] * 100 / 100 ?? 0,
-      obs: json['cpObs'] ?? '',
-      grade: json['cpGra'] ?? 0,
-      nome: json['nome'] ?? '',
-      gradeProduto: json['cpGra'] != 0
+      codigo: parseIntSafe(json['cpCodigo']),
+      produto: parseIntSafe(json['cpPro']),
+      estado: json['cpEstado']?.toString() ?? '',
+      valor: parseDoubleSafe(json['cpValor']),
+      quantidade: parseDoubleSafe(json['cpQuantidade']),
+      obs: json['cpObs']?.toString() ?? '',
+      grade: parseIntSafe(json['cpGra']),
+      nome: json['nome']?.toString() ?? '',
+      gradeProduto: (json['gradeProduto'] != null &&
+              json['gradeProduto'] is Map &&
+              json['gradeProduto'].isNotEmpty)
           ? GradeProduto.fromMap(json['gradeProduto'])
           : GradeProduto(codigo: 0, valor: 0, tamanho: ''),
-      complementos: (json['complementos'] as List)
-          .map((e) => Complementos.fromJson(e))
-          .toList(),
-      opcoesNiveis: (json['opcoesNivel'] as List)
-          .map((e) => OpcaoNivel.fromJson(e))
-          .toList(),
-      usuario: json['usuario'],
-      idAgrupamento: json['idAgrupamento'],
+      complementos: listaComplementos,
+      opcoesNiveis: listaOpcoes,
+      usuario: parseIntSafe(json['usuario']),
+      idAgrupamento: json['idAgrupamento']?.toString() ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      "codigo": codigo,
-      "produto": produto,
-      "estado": estado,
-      "valor": valor,
-      "quantidade": quantidade,
-      "obs": obs,
-      "grade": grade,
-      "codGrupo": codGrupo,
-      "nome": nome,
-      "gradeProduto": gradeProduto != null ? gradeProduto!.toJson() : null,
+      "codigo": codigo ?? 0,
+      "produto": produto ?? 0,
+      "estado": estado ?? '',
+      "valor": valor ?? 0.0,
+      "quantidade": quantidade ?? 0.0,
+      "obs": obs ?? '',
+      "grade": grade ?? 0,
+      "codGrupo": codGrupo ?? 0,
+      "nome": nome ?? '',
+      "gradeProduto": gradeProduto != null ? gradeProduto!.toJson() : {},
       "complementos": complementos != null
           ? complementos!.map((c) => c.toJson()).toList()
-          : null,
-      "opcoesNivel": opcoesNiveis != null
+          : [],
+      "opcoesNiveis": opcoesNiveis != null
           ? opcoesNiveis!.map((c) => c.toJson()).toList()
-          : null,
-      "usuario": usuario,
-      "idAgrupamento": idAgrupamento,
+          : [],
+      "usuario": usuario ?? 0,
+      "idAgrupamento": idAgrupamento ?? '',
     };
   }
 }

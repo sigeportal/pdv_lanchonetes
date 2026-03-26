@@ -18,17 +18,31 @@ class Nivel {
   });
 
   factory Nivel.fromJson(Map<String, dynamic> json) {
+    // Busca a lista de opções de forma flexível (maiúscula ou minúscula)
+    var rawOpcoes = json['opcoes'] ?? json['Opcoes'];
+    List<OpcaoNivel> listaOpcoes = [];
+
+    if (rawOpcoes != null && rawOpcoes is List) {
+      listaOpcoes = rawOpcoes
+          .map((e) => OpcaoNivel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+
     return Nivel(
-      codigo: json['codigo'] ?? 0,
-      titulo: json['titulo'] ?? '',
-      descricao: json['descricao'] ?? '',
-      selecaoMin: json['selecaoMin'] ?? 1,
-      selecaoMax: json['selecaoMax'] ?? 1,
-      opcoes: (json['opcoes'] as List?)
-              ?.map((e) => OpcaoNivel.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      codProduto: json['codProduto'] ?? 0,
+      codigo:
+          int.tryParse((json['codigo'] ?? json['Codigo'] ?? 0).toString()) ?? 0,
+      titulo: json['titulo'] ?? json['Titulo'] ?? '',
+      descricao: json['descricao'] ?? json['Descricao'] ?? '',
+      selecaoMin: int.tryParse(
+              (json['selecaoMin'] ?? json['SelecaoMin'] ?? 1).toString()) ??
+          1,
+      selecaoMax: int.tryParse(
+              (json['selecaoMax'] ?? json['SelecaoMax'] ?? 1).toString()) ??
+          1,
+      opcoes: listaOpcoes,
+      codProduto: int.tryParse(
+              (json['codProduto'] ?? json['CodProduto'] ?? 0).toString()) ??
+          0,
     );
   }
 
@@ -67,15 +81,39 @@ class OpcaoNivel {
   });
 
   factory OpcaoNivel.fromJson(Map<String, dynamic> json) {
+    // Conversões seguras que aceitam Int, Double ou String do backend
+    double valorConvertido = double.tryParse((json['valorAdicional'] ??
+                json['ValorAdicional'] ??
+                json['valor'] ??
+                json['Valor'] ??
+                0)
+            .toString()) ??
+        0.0;
+    int qtdConvertida = int.tryParse(
+            (json['quantidade'] ?? json['Quantidade'] ?? 1).toString()) ??
+        1;
+
+    // Tratamento de booleanos (as vezes a API manda "true" como string em vez do booleano primitivo)
+    bool isAtivo = json['ativo'] ?? json['Ativo'] ?? false;
+    if (json['ativo'] is String) {
+      isAtivo = json['ativo'].toString().toLowerCase() == 'true';
+    } else if (json['Ativo'] is String) {
+      isAtivo = json['Ativo'].toString().toLowerCase() == 'true';
+    }
+
     return OpcaoNivel(
-      codigo: json['codigo'] ?? 0,
-      nome: json['nome'] ?? '',
-      valorAdicional: (json['valorAdicional'] ?? 0).toDouble(),
-      ativo: json['ativo'] ?? false,
-      ativoStr: json['ativoStr'] ?? 'N',
-      codNivel: json['codNivel'] ?? 0,
-      selecionado: false,
-      quantidade: 0,
+      // --- AQUI ESTÁ A MÁGICA: Procura pelo código em minúsculo ou maiúsculo ---
+      codigo:
+          int.tryParse((json['codigo'] ?? json['Codigo'] ?? 0).toString()) ?? 0,
+      nome: json['nome'] ?? json['Nome'] ?? '',
+      valorAdicional: valorConvertido,
+      ativo: isAtivo,
+      ativoStr: json['ativoStr'] ?? json['AtivoStr'] ?? (isAtivo ? 'S' : 'N'),
+      codNivel: int.tryParse(
+              (json['codNivel'] ?? json['CodNivel'] ?? 0).toString()) ??
+          0,
+      selecionado: json['selecionado'] ?? json['Selecionado'] ?? false,
+      quantidade: qtdConvertida,
     );
   }
 

@@ -11,7 +11,7 @@ Future<List<Complementos>> fetchComplementos(int grupo) async {
   );
 
   Dio dio = new Dio(options);
-  final response = await dio.get<List>('/Complementos/$grupo');
+  final response = await dio.get<List>('/v1/complementos/$grupo');
   final resultado =
       response.data!.map((json) => Complementos.fromJson(json)).toList();
   return resultado;
