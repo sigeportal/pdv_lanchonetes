@@ -799,7 +799,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
                 int numeroPedido =
                     await OrderNumberService.generateNextOrderNumber();
 
-                /*await PrinterService.printOrder(
+                await PrinterService.printOrder(
                     itens: itens,
                     orderNumber: numeroPedido,
                     totalValue: valorComanda,
@@ -815,7 +815,7 @@ class _PaymentModePageState extends State<PaymentModePage> {
                     (route) => false,
                   );
                 }
-                */
+
                 comandaController.clear();
               }
             },
