@@ -50,15 +50,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-flutter_icons:
-  ios: false
-  android: true
-  image_path_ios: "assets/images/launcher.png"
-  image_path_android: "assets/images/launcher.png"
-  adaptive_icon_background: "assets/images/launcher.png"
-  adaptive_icon_foreground: "assets/images/launcher.png"
-
-
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -83,7 +74,7 @@ flutter:
     - assets/images/4 sabores/2.png
     - assets/images/4 sabores/3.png
     - assets/images/4 sabores/4.png
-    - assets/images/logo_pastelaria.png
+    - assets/images/logo.png
     # - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

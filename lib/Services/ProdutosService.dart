@@ -65,7 +65,7 @@ class ProdutosService {
       dio = new Dio(options);
       final response = await dio.get(url);
       final resultado = Map<String, dynamic>.from(response.data);
-      return resultado['base64'];
+      return resultado['url'];
     } catch (e) {
       throw Exception(e);
     }

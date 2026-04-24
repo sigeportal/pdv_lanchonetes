@@ -60,8 +60,8 @@ class _ImagemProdutoWidgetState extends State<ImagemProdutoWidget> {
                   snapshot.data != null &&
                   snapshot.data!.isNotEmpty) {
                 try {
-                  return Image.memory(
-                    base64Decode(snapshot.data!),
+                  return Image.network(
+                    snapshot.data!,
                     fit: BoxFit.cover,
                     height: widget.altura,
                     width: widget.largura,

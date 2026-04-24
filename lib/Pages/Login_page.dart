@@ -66,7 +66,7 @@ class _LoginPageState extends State<LoginPage> {
                       margin: EdgeInsets.only(top: 5),
                       height: 200,
                       child: Image.asset(
-                        'assets/images/logo_pastelaria.png',
+                        'assets/images/logo.png',
                         fit: BoxFit.cover,
                       ),
                     ),

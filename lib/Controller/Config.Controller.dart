@@ -12,10 +12,12 @@ class ConfigController {
 
   Future<String> getUrlBase() async {
     if (baseURL.value != '') {
-      return 'http://${baseURL.value}:9000';
+      // return 'http://${baseURL.value}:9000';
+      return baseURL.value!;
     }
     await getConfig();
-    return 'http://${baseURL.value}:9000';
+    // return 'http://${baseURL.value}:9000';
+    return baseURL.value!;
   }
 
   ConfigController._() {
