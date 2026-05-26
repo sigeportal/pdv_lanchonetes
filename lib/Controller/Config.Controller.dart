@@ -9,6 +9,7 @@ class ConfigController {
   final baseURL = ValueNotifier<String?>('');
   final useTables = ValueNotifier<bool>(false);
   final tableCount = ValueNotifier<int>(0);
+  final useTef = ValueNotifier<bool>(true);
 
   Future<String> getUrlBase() async {
     if (baseURL.value != '') {
@@ -42,17 +43,25 @@ class ConfigController {
     if (savedTableCount != null) {
       tableCount.value = int.tryParse(savedTableCount.toString()) ?? 0;
     }
+
+    var savedUseTef = await storage.get('useTef');
+    if (savedUseTef != null) {
+      useTef.value = savedUseTef == true || savedUseTef == 'true';
+    }
   }
 
-  saveConfig(String? url, bool useTablesValue, int tableCountValue) {
+  saveConfig(
+      String? url, bool useTablesValue, int tableCountValue, bool useTefValue) {
     // Atualiza a memória
     baseURL.value = url;
     useTables.value = useTablesValue;
     tableCount.value = tableCountValue;
+    useTef.value = useTefValue;
 
     // Salva no armazenamento local (convertendo para string para evitar erros no DB local)
     storage.put('urlBase', url);
     storage.put('useTables', useTablesValue.toString());
     storage.put('tableCount', tableCountValue.toString());
+    storage.put('useTef', useTefValue.toString());
   }
 }

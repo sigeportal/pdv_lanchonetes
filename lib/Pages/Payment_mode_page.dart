@@ -2,12 +2,20 @@ import 'package:lanchonete/Components/payment_option_tile.dart';
 import 'package:lanchonete/Controller/Comanda.Controller.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
+import 'package:lanchonete/Controller/Tef/types/tef_provider.dart';
 import 'package:lanchonete/Models/venda_model.dart';
 import 'package:lanchonete/Models/cliente_model.dart';
 import 'package:lanchonete/Pages/Tela_carregamento_page.dart';
 import 'package:lanchonete/Pages/ReimpressaoCupom_page.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/types/card_type.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/types/currency_code.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/types/fin_type.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/types/payment_mode.dart';
 
 import 'package:lanchonete/Controller/Config.Controller.dart';
 import 'package:lanchonete/Pages/Principal_page.dart';
@@ -32,6 +40,7 @@ class PaymentModePage extends StatefulWidget {
 }
 
 class _PaymentModePageState extends State<PaymentModePage> {
+  final TefController _tefController = Get.find<TefController>();
   final NumberFormat _currencyFormat =
       NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
 
@@ -39,11 +48,13 @@ class _PaymentModePageState extends State<PaymentModePage> {
   Cliente? _clienteSelecionado;
 
   bool _isParaLevar = false;
+  bool _tefEmAndamento = false;
 
   double get _totalPago => _pagamentos.fold(0, (sum, p) => sum + p.valor);
   double get _valorRestante =>
       (widget.valorPagamento - _totalPago).clamp(0, double.infinity);
   bool get _podeFinalizar => _valorRestante <= 0.01;
+  bool get _useTef => ConfigController.instance.useTef.value;
 
   String _formatPayment(double val) {
     return _currencyFormat.format(val);
@@ -328,28 +339,28 @@ class _PaymentModePageState extends State<PaymentModePage> {
         title: "Débito",
         subtitle: "Cartão",
         color: Colors.blueAccent,
-        onPressed: () => _adicionarPagamentoGenerico("Débito", 'debito'),
+        onPressed: () => _adicionarPagamentoDebitoTef(),
       ),
       PaymentOptionTile(
         icon: Icons.credit_card,
         title: "Crédito",
         subtitle: "Cartão",
         color: Colors.green,
-        onPressed: () => _adicionarPagamentoGenerico("Crédito", 'credito'),
+        onPressed: () => _adicionarPagamentoCreditoTef(),
       ),
       PaymentOptionTile(
         icon: Icons.qr_code,
         title: "PIX",
         subtitle: "Digital",
         color: Colors.indigo,
-        onPressed: () => _adicionarPagamentoGenerico("PIX", 'pix'),
+        onPressed: () => _adicionarPagamentoCarteiraDigitalTef(),
       ),
       PaymentOptionTile(
         icon: Icons.card_giftcard,
         title: "Voucher",
         subtitle: "Vale",
         color: Colors.orange,
-        onPressed: () => _adicionarPagamentoGenerico("Voucher", 'voucher'),
+        onPressed: () => _adicionarPagamentoVoucherTef(),
       ),
       PaymentOptionTile(
         icon: Icons.person_search,
@@ -400,6 +411,160 @@ class _PaymentModePageState extends State<PaymentModePage> {
     if (valor != null && valor > 0) {
       _adicionarParcela('pedido', valor);
     }
+  }
+
+  Future<void> _adicionarPagamentoDebitoTef() async {
+    if (!_useTef) {
+      await _adicionarPagamentoGenerico("Valor no debito", 'debito');
+      return;
+    }
+
+    final transacao = TransacaoRequisicaoVenda(
+      amount: _valorRestante,
+      currencyCode: CurrencyCode.iso4217Real,
+    )
+      ..provider = _tefController.configuracoes.provider.toValue()
+      ..cardType = CardType.cartaoDebito
+      ..finType = FinType.aVista;
+
+    await _processarPagamentoTef(transacao, 'debito');
+  }
+
+  Future<void> _adicionarPagamentoCreditoTef() async {
+    if (!_useTef) {
+      await _adicionarPagamentoGenerico("Valor no credito", 'credito');
+      return;
+    }
+
+    final transacao = TransacaoRequisicaoVenda(
+      amount: _valorRestante,
+      currencyCode: CurrencyCode.iso4217Real,
+    )
+      ..provider = _tefController.configuracoes.provider.toValue()
+      ..cardType = CardType.cartaoCredito;
+
+    final finType = await _selecionarFinanciamento();
+    if (finType == null) return;
+
+    transacao.finType = finType;
+    if (finType == FinType.parceladoEmissor ||
+        finType == FinType.parceladoEstabelecimento) {
+      final parcelas = await _selecionarParcelas(_valorRestante);
+      if (parcelas == null) return;
+      transacao.installments = parcelas.toDouble();
+    }
+
+    await _processarPagamentoTef(transacao, 'credito');
+  }
+
+  Future<void> _adicionarPagamentoCarteiraDigitalTef() async {
+    if (!_useTef) {
+      await _adicionarPagamentoGenerico("Valor no PIX", 'pix');
+      return;
+    }
+
+    final transacao = TransacaoRequisicaoVenda(
+      amount: _valorRestante,
+      currencyCode: CurrencyCode.iso4217Real,
+    )
+      ..provider = TefProvider.NENHUM.toValue()
+      ..finType = FinType.aVista
+      ..paymentMode = PaymentMode.pagamentoCarteiraVirtual;
+
+    await _processarPagamentoTef(transacao, 'pix');
+  }
+
+  Future<void> _adicionarPagamentoVoucherTef() async {
+    if (!_useTef) {
+      await _adicionarPagamentoGenerico("Valor no voucher", 'voucher');
+      return;
+    }
+
+    final transacao = TransacaoRequisicaoVenda(
+      amount: _valorRestante,
+      currencyCode: CurrencyCode.iso4217Real,
+    )
+      ..provider = _tefController.configuracoes.provider.toValue()
+      ..cardType = CardType.cartaoVoucher
+      ..finType = FinType.aVista;
+
+    await _processarPagamentoTef(transacao, 'voucher');
+  }
+
+  Future<void> _processarPagamentoTef(
+      TransacaoRequisicaoVenda transacao, String tipoString) async {
+    if (!_useTef) {
+      Fluttertoast.showToast(msg: "TEF desativado nas configuracoes.");
+      return;
+    }
+
+    if (_valorRestante < TefController.VALOR_MINIMO_VENDA) {
+      Fluttertoast.showToast(msg: "Valor minimo TEF: R\$ 1,00");
+      return;
+    }
+    if (_valorRestante > TefController.VALOR_MAXIMO_VENDA) {
+      Fluttertoast.showToast(msg: "Valor maximo TEF: R\$ 100.000,00");
+      return;
+    }
+    if (_tefEmAndamento) return;
+
+    setState(() => _tefEmAndamento = true);
+    try {
+      await _tefController.vender(transacao);
+      if (!mounted) return;
+      _adicionarParcela(tipoString, transacao.amount);
+    } catch (e) {
+      Fluttertoast.showToast(msg: "TEF nao aprovado: $e");
+    } finally {
+      if (mounted) setState(() => _tefEmAndamento = false);
+    }
+  }
+
+  Future<FinType?> _selecionarFinanciamento() async {
+    return showDialog<FinType>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Forma de financiamento'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, FinType.aVista),
+            child: const Text('A vista'),
+          ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, FinType.parceladoEmissor),
+            child: const Text('Parcelado emissor'),
+          ),
+          SimpleDialogOption(
+            onPressed: () =>
+                Navigator.pop(context, FinType.parceladoEstabelecimento),
+            child: const Text('Parcelado estabelecimento'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<int?> _selecionarParcelas(double valor) async {
+    if (valor < 10) {
+      Fluttertoast.showToast(msg: "Valor minimo para parcelar: R\$ 10,00");
+      return null;
+    }
+
+    final maxParcelas = (valor / 5).floor().clamp(2, 99).toInt();
+    return showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Quantidade de parcelas'),
+        children: List.generate(maxParcelas - 1, (index) {
+          final parcela = index + 2;
+          return SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, parcela),
+            child: Text('$parcela x'),
+          );
+        }),
+      ),
+    );
   }
 
   Future<void> _adicionarPagamentoGenerico(

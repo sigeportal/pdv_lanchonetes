@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:lanchonete/Controller/Tef/paygo_request_handler.dart';
 import 'package:lanchonete/Controller/Tef/paygo_response_handler.dart';
 import 'package:lanchonete/Controller/Tef/types/pending_transaction_actions.dart';
@@ -6,6 +8,7 @@ import 'package:lanchonete/Models/tef_paygo_config.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_resposta.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/models/transacao/transacao_requisicao_venda.dart';
 import 'package:paygo_sdk/paygo_integrado_uri/domain/types/transaction_status.dart';
 
 /// [TefController] é a classe que implementa as regras de negócio do TEF PayGo
@@ -15,6 +18,7 @@ class TefController extends GetxController implements TefPayGoCallBack {
   final PayGoRequestHandler _payGORequestHandler = PayGoRequestHandler();
   late PayGOResponseHandler _payGOResponseHandler;
   late TefPayGoConfiguracoes _configuracoes = TefPayGoConfiguracoes();
+  Completer<TransacaoRequisicaoResposta>? _vendaCompleter;
   
   static const VALOR_MINIMO_VENDA = 1.00;
   static const VALOR_MAXIMO_VENDA = 100000.00;
@@ -30,6 +34,44 @@ class TefController extends GetxController implements TefPayGoCallBack {
     _configuracoes = configuracoes;
   }
 
+  Future<void> instalacao() => _payGORequestHandler.instalacao();
+
+  Future<void> manutencao() => _payGORequestHandler.manutencao();
+
+  Future<void> painelAdministrativo() =>
+      _payGORequestHandler.painelAdministrativo();
+
+  Future<void> reimpressao() => _payGORequestHandler.reimpressao();
+
+  Future<void> exibePDC() => _payGORequestHandler.exibePDC();
+
+  Future<void> relatorioDetalhado() =>
+      _payGORequestHandler.relatorioDetalhado();
+
+  Future<void> relatorioResumido() => _payGORequestHandler.relatorioResumido();
+
+  Future<TransacaoRequisicaoResposta> vender(
+      TransacaoRequisicaoVenda transacao) async {
+    if (_vendaCompleter != null && !_vendaCompleter!.isCompleted) {
+      throw Exception('Ja existe uma transacao TEF em andamento.');
+    }
+
+    _vendaCompleter = Completer<TransacaoRequisicaoResposta>();
+    try {
+      await _payGORequestHandler.venda(transacao);
+    } catch (e) {
+      _vendaCompleter = null;
+      rethrow;
+    }
+    return _vendaCompleter!.future.timeout(
+      const Duration(minutes: 5),
+      onTimeout: () {
+        _vendaCompleter = null;
+        throw TimeoutException('Tempo esgotado aguardando retorno do PayGo.');
+      },
+    );
+  }
+
   @override
   Future<void> onPrinter(TransacaoRequisicaoResposta resposta) async {
     // Implementação de impressão pode ser adicionada futuramente
@@ -43,6 +85,10 @@ class TefController extends GetxController implements TefPayGoCallBack {
 
   @override
   Future<void> onErrorMessage(String message) async {
+    if (_vendaCompleter != null && !_vendaCompleter!.isCompleted) {
+      _vendaCompleter!.completeError(Exception(message));
+      _vendaCompleter = null;
+    }
     await _showDialog("Erro", message, Colors.red, Icons.error);
   }
 
@@ -88,12 +134,26 @@ class TefController extends GetxController implements TefPayGoCallBack {
       await onPrinter(response);
       
       // Redireciona para a tela inicial após sucesso
-      Get.offAllNamed('/');
+      if (_vendaCompleter != null && !_vendaCompleter!.isCompleted) {
+        _vendaCompleter!.complete(response);
+        _vendaCompleter = null;
+      }
+    } else if (_vendaCompleter != null && !_vendaCompleter!.isCompleted) {
+      _vendaCompleter!.completeError(
+        Exception('Transacao aprovada aguardando confirmacao manual.'),
+      );
+      _vendaCompleter = null;
     }
   }
 
   @override
   void onPendingTransaction(String transactionPendingData) async {
+    if (_vendaCompleter != null && !_vendaCompleter!.isCompleted) {
+      _vendaCompleter!.completeError(
+        Exception('Existe transacao pendente no PayGo. Resolva a pendencia.'),
+      );
+      _vendaCompleter = null;
+    }
     switch (_configuracoes.pendingTransactionActions) {
       case PendingTransactionActions.CONFIRM:
         await _payGORequestHandler.resolverPendencia(

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lanchonete/Controller/Config.Controller.dart';
+import 'package:get/get.dart';
+import 'package:lanchonete/Controller/Tef/paygo_tefcontroller.dart';
+import 'package:lanchonete/Controller/Tef/types/pending_transaction_actions.dart';
+import 'package:lanchonete/Controller/Tef/types/tef_provider.dart';
 import 'package:lanchonete/Pages/Login_page.dart';
+import 'package:paygo_sdk/paygo_integrado_uri/domain/types/transaction_status.dart';
 
 class ConfigPage extends StatefulWidget {
   @override
@@ -9,16 +14,27 @@ class ConfigPage extends StatefulWidget {
 }
 
 class _ConfigPageState extends State<ConfigPage> {
+  final TefController _tefController = Get.find<TefController>();
   String? _urlBase;
   bool _useTables = false;
+  bool _useTef = true;
   int _tableCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _urlBase = ConfigController.instance.baseURL.value;
-    _useTables = ConfigController.instance.useTables.value;
-    _tableCount = ConfigController.instance.tableCount.value;
+    _loadConfig();
+  }
+
+  Future<void> _loadConfig() async {
+    await ConfigController.instance.getConfig();
+    if (!mounted) return;
+    setState(() {
+      _urlBase = ConfigController.instance.baseURL.value;
+      _useTables = ConfigController.instance.useTables.value;
+      _useTef = ConfigController.instance.useTef.value;
+      _tableCount = ConfigController.instance.tableCount.value;
+    });
   }
 
   @override
@@ -39,7 +55,7 @@ class _ConfigPageState extends State<ConfigPage> {
             onPressed: () {
               // Salva todas as configurações de uma vez
               ConfigController.instance
-                  .saveConfig(_urlBase, _useTables, _tableCount);
+                  .saveConfig(_urlBase, _useTables, _tableCount, _useTef);
 
               Navigator.pushReplacement(
                 context,
@@ -66,7 +82,7 @@ class _ConfigPageState extends State<ConfigPage> {
                   fontSize: 22,
                 ),
                 initialValue: _urlBase,
-                keyboardType: TextInputType.number,
+                keyboardType: TextInputType.text,
                 onChanged: (String url) {
                   _urlBase = url;
                 },
@@ -120,10 +136,155 @@ class _ConfigPageState extends State<ConfigPage> {
                   ),
                 ),
               ],
+              SizedBox(height: 30),
+              _buildTefSection(),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTefSection() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'TEF PayGo',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            SwitchListTile(
+              title: Text('Usar TEF'),
+              subtitle: Text(_useTef
+                  ? 'Pagamentos em cartao/PIX passam pelo PayGo'
+                  : 'Pagamentos em cartao/PIX serao lancados manualmente'),
+              value: _useTef,
+              onChanged: (value) {
+                setState(() {
+                  _useTef = value;
+                });
+              },
+            ),
+            if (_useTef) ...[
+            SwitchListTile(
+              title: Text('Confirmacao automatica'),
+              value: _tefController.configuracoes.isAutoConfirm,
+              onChanged: (value) {
+                setState(() {
+                  _tefController.configuracoes.setIsAutoConfirm(value);
+                });
+              },
+            ),
+            SwitchListTile(
+              title: Text('Imprimir via do cliente'),
+              value: _tefController.configuracoes.isPrintcardholderReceipt,
+              onChanged: (value) {
+                setState(() {
+                  _tefController.configuracoes
+                      .setIsPrintcardholderReceipt(value);
+                });
+              },
+            ),
+            SwitchListTile(
+              title: Text('Imprimir via do estabelecimento'),
+              value: _tefController.configuracoes.isPrintMerchantReceipt,
+              onChanged: (value) {
+                setState(() {
+                  _tefController.configuracoes
+                      .setIsPrintMerchantReceipt(value);
+                });
+              },
+            ),
+            DropdownButtonFormField<TefProvider>(
+              decoration: InputDecoration(labelText: 'Adquirente'),
+              value: _tefController.configuracoes.provider,
+              items: TefProvider.values
+                  .map((provider) => DropdownMenuItem(
+                        value: provider,
+                        child: Text(provider.toString().split('.').last),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() => _tefController.configuracoes.provider = value);
+              },
+            ),
+            SizedBox(height: 12),
+            DropdownButtonFormField<PendingTransactionActions>(
+              decoration: InputDecoration(labelText: 'Transacao pendente'),
+              value: _tefController.configuracoes.pendingTransactionActions
+                  as PendingTransactionActions,
+              items: PendingTransactionActions.values
+                  .map((action) => DropdownMenuItem(
+                        value: action,
+                        child: Text(action.toString().split('.').last),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _tefController.configuracoes
+                      .setPendingTransactionActions(value);
+                });
+              },
+            ),
+            SizedBox(height: 12),
+            DropdownButtonFormField<TransactionStatus>(
+              decoration: InputDecoration(labelText: 'Tipo de confirmacao'),
+              value:
+                  _tefController.configuracoes.tipoDeConfirmacao as TransactionStatus,
+              items: TransactionStatus.values
+                  .map((status) => DropdownMenuItem(
+                        value: status,
+                        child: Text(status.toString().split('.').last),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _tefController.configuracoes.setTipoDeConfirmacao(value);
+                });
+              },
+            ),
+            SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildTefAction('Instalacao', _tefController.instalacao),
+                _buildTefAction('Manutencao', _tefController.manutencao),
+                _buildTefAction(
+                    'Administrativo', _tefController.painelAdministrativo),
+                _buildTefAction('Reimpressao', _tefController.reimpressao),
+                _buildTefAction('Exibe PDC', _tefController.exibePDC),
+                _buildTefAction(
+                    'Rel. detalhado', _tefController.relatorioDetalhado),
+                _buildTefAction(
+                    'Rel. resumido', _tefController.relatorioResumido),
+              ],
+            ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTefAction(String label, Future<void> Function() action) {
+    return ElevatedButton(
+      onPressed: () async {
+        try {
+          await action();
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Falha no TEF: $e')),
+          );
+        }
+      },
+      child: Text(label),
     );
   }
 }

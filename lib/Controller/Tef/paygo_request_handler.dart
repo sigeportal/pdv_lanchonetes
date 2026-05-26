@@ -68,9 +68,53 @@ class PayGoRequestHandler {
     );
   }
 
+  Future<void> instalacao() async {
+    await _repository.integrado.generico(
+      intentAction: IntentAction.payment,
+      requisicao: TransacaoRequisicaoGenerica(operation: Operation.instalacao),
+      dadosAutomacao: _dadosAutomacao,
+    );
+  }
+
+  Future<void> manutencao() async {
+    await _repository.integrado.generico(
+      intentAction: IntentAction.payment,
+      requisicao: TransacaoRequisicaoGenerica(operation: Operation.manutencao),
+      dadosAutomacao: _dadosAutomacao,
+    );
+  }
+
   /// Painel administrativo
   Future<void> painelAdministrativo() async {
     await _repository.integrado.administrativo(
+      dadosAutomacao: _dadosAutomacao,
+    );
+  }
+
+  Future<void> exibePDC() async {
+    await _repository.integrado.generico(
+      intentAction: IntentAction.payment,
+      requisicao: TransacaoRequisicaoGenerica(operation: Operation.exibePdc),
+      dadosAutomacao: _dadosAutomacao,
+    );
+  }
+
+  Future<void> relatorioDetalhado() async {
+    await _repository.integrado.generico(
+      intentAction: IntentAction.payment,
+      requisicao: TransacaoRequisicaoGenerica(
+        operation: Operation.relatorioDetalhado,
+      ),
+      dadosAutomacao: _dadosAutomacao,
+    );
+  }
+
+  Future<void> relatorioResumido() async {
+    await _repository.integrado.generico(
+      intentAction: IntentAction.payment,
+      requisicao: TransacaoRequisicaoGenerica(
+        operation: Operation.relatorioResumido,
+      ),
       dadosAutomacao: _dadosAutomacao,
     );
   }

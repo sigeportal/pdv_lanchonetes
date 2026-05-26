@@ -1,5 +1,6 @@
 import 'package:lanchonete/Constants.dart';
 import 'package:lanchonete/Controller/Config.Controller.dart';
+import 'package:lanchonete/Pages/Caixa_page.dart';
 import 'package:lanchonete/Pages/Categoria_page.dart';
 import 'package:lanchonete/Pages/Config_page.dart';
 import 'package:lanchonete/Pages/Consulta_Produtos_page.dart';
@@ -7,7 +8,14 @@ import 'package:lanchonete/Pages/PrintersConfigPage.dart';
 import 'package:lanchonete/Pages/Mesas_page.dart';
 import 'package:flutter/material.dart';
 
-enum Paginas { mesas, categorias, consultaProdutos, configuracao, impressoras }
+enum Paginas {
+  mesas,
+  categorias,
+  consultaProdutos,
+  caixa,
+  configuracao,
+  impressoras
+}
 
 class PrincipalPage extends StatefulWidget {
   final Paginas paginas;
@@ -19,6 +27,8 @@ class PrincipalPage extends StatefulWidget {
 }
 
 class _PrincipalPageState extends State<PrincipalPage> {
+  static bool _caixaInicialJaAberto = false;
+
   late int _selectedIndex;
   int? _mesaSelecionada;
   String? _estadoMesaSelecionada;
@@ -39,6 +49,18 @@ class _PrincipalPageState extends State<PrincipalPage> {
         _selectedIndex == Paginas.categorias.index &&
         _mesaSelecionada == null) {
       _selectedIndex = Paginas.mesas.index;
+    }
+
+    if (!_caixaInicialJaAberto) {
+      _caixaInicialJaAberto = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const CaixaPage(aberturaInicial: true),
+          ),
+        );
+      });
     }
   }
 
@@ -77,6 +99,7 @@ class _PrincipalPageState extends State<PrincipalPage> {
         },
       ),
       ConsultaProdutosPage(),
+      const CaixaPage(),
       ConfigPage(),
       PrinterConfigPage()
     ];
@@ -151,6 +174,12 @@ class _PrincipalPageState extends State<PrincipalPage> {
                         _selectedIndex == Paginas.consultaProdutos.index,
                     onTap: () => _onItemTapped(Paginas.consultaProdutos.index),
                   ),
+                  _buildDrawerItem(
+                    icon: Icons.point_of_sale,
+                    text: 'Abrir/Fechar Caixa',
+                    isSelected: _selectedIndex == Paginas.caixa.index,
+                    onTap: () => _onItemTapped(Paginas.caixa.index),
+                  ),
                   const Divider(),
                   _buildDrawerItem(
                     icon: Icons.settings_rounded,
@@ -184,8 +213,9 @@ class _PrincipalPageState extends State<PrincipalPage> {
   final List<String> _titulos = [
     'Mesas',
     'Vendas',
-    'Consultar Preço',
-    'Configurações',
+    'Consultar Preco',
+    'Caixa PDV',
+    'Configuracoes',
     'Impressoras'
   ];
 
